@@ -337,6 +337,28 @@
       background: linear-gradient(to right, transparent, rgba(209, 213, 219, 0.5), transparent);
       margin: 16px 0;
     }
+
+    /* 文本行数限制 */
+    .line-clamp-1 {
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .line-clamp-3 {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
   </style>
 </head>
 
@@ -513,7 +535,7 @@
       <div v-show="currentTab === 'questions'"
         class="h-full flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden">
         <!-- 题目列表容器，使用overflow-auto使其可滚动 -->
-        <div class="flex-1 overflow-auto relative" ref="questionListContainer">
+        <div class="flex-1 overflow-auto relative">
           <!-- 标题部分（可滚动） -->
           <div class="gradient-bg px-6 pt-8 pb-6">
             <div class="mb-4">
@@ -539,7 +561,7 @@
             <!-- 搜索框 -->
             <div class="gradient-bg px-6 pb-6">
               <div class="relative pt-2">
-                <input v-model="searchQuery" type="text" placeholder="搜索题目内容、答案..."
+                <input v-model="searchQuery" type="text" placeholder="搜索题目内容、答案..." @focus="openMobileSearch"
                   class="w-full bg-white/20 border border-white/30 rounded-2xl pl-12 pr-4 py-4 text-white placeholder-purple-200 input-glow">
                 <i data-lucide="search"
                   class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-purple-200"></i>
@@ -588,8 +610,8 @@
 
           <!-- 题目列表 -->
           <div class="w-full px-6 pb-20">
-            <div v-if="pagedQuestions.length > 0" class="space-y-4">
-              <div v-for="(question, index) in pagedQuestions" :key="index"
+            <div v-if="filteredQuestions.length > 0" class="space-y-4">
+              <div v-for="(question, index) in displayedQuestions" :key="index"
                 class="bg-white rounded-2xl shadow-sm hover-rise transition-all duration-300">
                 <div class="p-6">
                   <!-- 题目标签 -->
@@ -604,7 +626,7 @@
                       </span>
                     </div>
                     <div class="flex items-center space-x-2">
-                      <div class="text-xs text-gray-400">#{{ index + 1 }}</div>
+                      <div class="text-xs text-gray-400">#{{ getQuestionIndex(question) }}</div>
                       <button @click="confirmDeleteQuestion(question)"
                         class="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -644,10 +666,19 @@
                   </div>
                 </div>
               </div>
-              <!-- 加载更多/全部加载完毕提示区域 -->
-              <div class="text-center py-4 text-gray-400 text-sm select-none">
-                <template v-if="isLoadingMore">正在加载更多...</template>
-                <template v-else-if="isAllLoaded && pagedQuestions.length > 0">已全部加载完毕</template>
+
+              <!-- 加载更多指示器 -->
+              <div v-if="hasMoreQuestions" class="py-4 text-center">
+                <div class="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-700 rounded-full">
+                  <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-700 mr-2"></div>
+                  <span>加载更多题目...</span>
+                </div>
+              </div>
+
+              <!-- 全部加载完成提示 -->
+              <div v-if="!hasMoreQuestions && filteredQuestions.length > pageSize"
+                class="py-4 text-center text-gray-500 text-sm">
+                <span>— 已加载全部题目 —</span>
               </div>
             </div>
 
@@ -993,11 +1024,11 @@
     <!-- 题目详情弹窗 -->
     <div v-if="showQuestionDetailModal"
       class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div class="bg-white w-full h-full shadow-2xl bounce-in flex flex-col">
+      <div :class="['bg-white w-full h-full shadow-2xl flex flex-col', !fromMobileSearch && 'bounce-in']">
         <!-- 顶部导航栏 -->
         <div class="gradient-bg px-6 py-4 flex items-center justify-between">
           <div class="flex gap-2 items-center">
-            <button @click="showQuestionDetailModal = false" class="text-white p-2 hover:bg-white/20 rounded-full">
+            <button @click="closeQuestionDetail" class="text-white p-2 hover:bg-white/20 rounded-full">
               <i data-lucide="arrow-left" class="w-5 h-5"></i>
             </button>
             <h3 class="text-lg font-bold text-white">题目详情</h3>
@@ -1428,6 +1459,49 @@
         </div>
       </div>
     </div>
+
+    <!-- 手机搜索页面模态框 -->
+    <div v-if="showMobileSearchModal" class="fixed inset-0 bg-white z-50 flex flex-col">
+      <!-- 搜索页面顶部 -->
+      <div class="gradient-bg px-4 py-3 flex items-center space-x-2">
+        <button @click="closeMobileSearch" class="text-white p-2 rounded-full hover:bg-white/20">
+          <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        </button>
+        <div class="flex-1 relative">
+          <input v-model="searchQuery" type="text" placeholder="搜索题目内容、答案..." ref="mobileSearchInput"
+            class="w-full bg-white/20 border border-white/30 rounded-xl pl-10 pr-4 py-2 text-white placeholder-purple-200 input-glow">
+          <i data-lucide="search"
+            class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-purple-200"></i>
+          <button v-if="searchQuery" @click="searchQuery = ''"
+            class="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-white/20">
+            <i data-lucide="x" class="w-3.5 h-3.5 text-purple-200"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- 搜索结果列表 -->
+      <div class="flex-1 overflow-y-auto bg-gray-50 p-4">
+        <!-- 有结果时显示 -->
+        <div v-if="filteredQuestions.length > 0" class="space-y-2">
+          <div v-for="(question, index) in filteredQuestions" :key="index" @click="selectSearchResult(question)"
+            class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:bg-blue-50 active:bg-blue-100 transition-colors cursor-pointer flex items-center">
+            <div class="flex-1 min-w-0">
+              <p class="text-gray-800 line-clamp-2">{{ question.title }}</p>
+            </div>
+            <i data-lucide="chevron-right" class="w-5 h-5 text-gray-400 ml-2 flex-shrink-0"></i>
+          </div>
+        </div>
+
+        <!-- 无结果时显示 -->
+        <div v-else class="text-center py-16">
+          <div class="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i data-lucide="search-x" class="w-8 h-8 text-gray-400"></i>
+          </div>
+          <h3 class="text-lg font-medium text-gray-700 mb-1">未找到相关题目</h3>
+          <p class="text-gray-500 text-sm">尝试使用其他关键词搜索</p>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -1610,7 +1684,7 @@
       }
     }
 
-    const { createApp, ref, computed, onMounted, watch } = Vue;
+    const { createApp, ref, computed, onMounted, watch, onUnmounted } = Vue;
 
     const App = {
       setup() {
@@ -1642,6 +1716,16 @@
         const importMethod = ref('file');
         const importFileInput = ref(null);
         const selectedFileName = ref('');
+        const showMobileSearchModal = ref(false); // 手机搜索模态框状态
+        const isMobileDevice = ref(false); // 是否为移动设备
+        const mobileSearchInput = ref(null); // 手机搜索输入框引用
+        const fromMobileSearch = ref(false); // 标记是否从手机搜索页面进入详情页
+
+        // 虚拟滚动相关状态
+        const pageSize = ref(20); // 每页显示的题目数量
+        const currentPage = ref(1); // 当前页码
+        const isLoadingMore = ref(false); // 是否正在加载更多
+        const scrollContainer = ref(null); // 滚动容器引用
 
         // 题目详情相关状态
         const showQuestionDetailModal = ref(false);
@@ -1807,6 +1891,37 @@
 
           return filtered;
         });
+
+        // 虚拟滚动相关计算属性
+        const displayedQuestions = computed(() => {
+          const endIndex = pageSize.value * currentPage.value;
+          return filteredQuestions.value.slice(0, endIndex);
+        });
+
+        const hasMoreQuestions = computed(() => {
+          return displayedQuestions.value.length < filteredQuestions.value.length;
+        });
+
+        // 获取题目在过滤后列表中的实际索引
+        const getQuestionIndex = (question) => {
+          return filteredQuestions.value.indexOf(question) + 1;
+        };
+
+        // 加载更多题目
+        const loadMoreQuestions = () => {
+          if (isLoadingMore.value || !hasMoreQuestions.value) return;
+
+          isLoadingMore.value = true;
+
+          // 模拟异步加载
+          setTimeout(() => {
+            currentPage.value++;
+            isLoadingMore.value = false;
+
+            // 重新初始化新加载题目的图标
+            setTimeout(() => lucide.createIcons(), 100);
+          }, 300);
+        };
 
         const todayQuestions = computed(() => {
           // 模拟今日新增题目数量
@@ -2494,97 +2609,72 @@
           showAddQuestionModal.value = false;
         };
 
-        // ========== 懒加载分页相关状态 ==========
-        /**
-         * @type {import('vue').Ref<number>} 当前已加载的题目数量
-         */
-        const questionPageSize = 20; // 每页加载数量
-        const loadedQuestionCount = ref(questionPageSize); // 当前已加载数量
-        /**
-         * @type {import('vue').Ref<HTMLElement|null>} 题目列表容器ref
-         */
-        const questionListContainer = ref(null);
-        /**
-         * @type {import('vue').ComputedRef<Array>} 当前分页后实际渲染的题目
-         */
-        const pagedQuestions = computed(() => filteredQuestions.value.slice(0, loadedQuestionCount.value));
-        /**
-         * @function resetQuestionPagination
-         * @description 重置分页（如切换筛选/搜索时）
-         */
-        function resetQuestionPagination() {
-          loadedQuestionCount.value = questionPageSize;
-        }
-        // 监听筛选/搜索变化时重置分页
-        watch([filteredQuestions, searchQuery, selectedCategory, selectedSubjectFilter], resetQuestionPagination);
-        /**
-         * @type {import('vue').Ref<boolean>} 是否正在加载更多
-         */
-        const isLoadingMore = ref(false);
-        /**
-         * @type {import('vue').ComputedRef<boolean>} 是否已全部加载完毕
-         */
-        const isAllLoaded = computed(() => loadedQuestionCount.value >= filteredQuestions.value.length);
-        /**
-         * @type {number} 上次提示的题目数量
-         */
-        let lastNotifiedCount = 0;
-        /**
-         * @function handleQuestionListScroll
-         * @description 懒加载滚动监听，距离底部100px时加载更多，并显示提示
-         */
-        function handleQuestionListScroll() {
-          const el = questionListContainer.value;
-          if (!el) return;
-          // 距离底部100px以内时加载
-          if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
-            if (loadedQuestionCount.value < filteredQuestions.value.length) {
-              if (!isLoadingMore.value) {
-                isLoadingMore.value = true;
-                // notify.info('正在加载更多...');
-                setTimeout(() => {
-                  loadedQuestionCount.value = Math.min(
-                    loadedQuestionCount.value + questionPageSize,
-                    filteredQuestions.value.length
-                  );
-                  isLoadingMore.value = false;
-                  // 如果加载后全部加载完，给出提示
-                  if (loadedQuestionCount.value >= filteredQuestions.value.length && lastNotifiedCount !== loadedQuestionCount.value) {
-                    // notify.info('已全部加载完毕');
-                    lastNotifiedCount = loadedQuestionCount.value;
-                  }
-                }, 300); // 模拟加载延迟
-              }
-            } else if (lastNotifiedCount !== loadedQuestionCount.value) {
-              // 已全部加载完，且未提示过
-              notify.info('已全部加载完毕');
-              lastNotifiedCount = loadedQuestionCount.value;
-            }
-          }
-        }
-        // 页面挂载后绑定滚动事件
-        onMounted(() => {
-          loadFromLocalStorage();
-          loadConfig();
-          setTimeout(() => lucide.createIcons(), 100);
-          // 绑定滚动事件
-          if (questionListContainer.value) {
-            questionListContainer.value.addEventListener('scroll', handleQuestionListScroll);
-          }
-        });
-        // 切换tab时重新绑定滚动事件（防止ref丢失）
-        watch(currentTab, () => {
-          if (currentTab.value === 'questions' && questionListContainer.value) {
-            questionListContainer.value.addEventListener('scroll', handleQuestionListScroll);
-          }
-        });
-
         // 生命周期钩子
         onMounted(() => {
           loadFromLocalStorage();
           loadConfig();
           // 确保图标正确加载
           setTimeout(() => lucide.createIcons(), 100);
+
+          // 设置滚动监听
+          setupScrollListener();
+
+          // 检测是否为移动设备
+          checkMobileDevice();
+
+          // 监听窗口大小变化，更新移动设备状态
+          window.addEventListener('resize', checkMobileDevice);
+        });
+
+        // 清理事件监听
+        onUnmounted(() => {
+          window.removeEventListener('resize', checkMobileDevice);
+        });
+
+        // 检测是否为移动设备
+        const checkMobileDevice = () => {
+          isMobileDevice.value = window.innerWidth < 768; // 小于768px视为移动设备
+        };
+
+        // 设置滚动监听器
+        const setupScrollListener = () => {
+          // 获取滚动容器
+          const container = document.querySelector('.flex-1.overflow-auto');
+          if (container) {
+            scrollContainer.value = container;
+
+            // 添加滚动事件监听
+            container.addEventListener('scroll', handleScroll);
+
+            // 清理函数
+            onUnmounted(() => {
+              if (scrollContainer.value) {
+                scrollContainer.value.removeEventListener('scroll', handleScroll);
+              }
+            });
+          }
+        };
+
+        // 处理滚动事件
+        const handleScroll = () => {
+          if (!scrollContainer.value || isLoadingMore.value || !hasMoreQuestions.value) return;
+
+          const { scrollTop, scrollHeight, clientHeight } = scrollContainer.value;
+
+          // 当距离底部100px时加载更多
+          if (scrollHeight - scrollTop - clientHeight < 100) {
+            loadMoreQuestions();
+          }
+        };
+
+        // 监听筛选条件变化，重置分页
+        watch([searchQuery, selectedCategory, selectedSubjectFilter], () => {
+          currentPage.value = 1;
+
+          // 滚动到顶部
+          if (scrollContainer.value) {
+            scrollContainer.value.scrollTop = 0;
+          }
         });
 
         // 监听deleteSourceSubject的变化，如果为true，则自动设置deleteSourceAfterTransfer为true
@@ -3112,7 +3202,63 @@
           }
         };
 
+        // 打开手机搜索页面
+        const openMobileSearch = () => {
+          // 只在移动设备上打开搜索模态框
+          if (isMobileDevice.value) {
+            showMobileSearchModal.value = true;
+            // 在下一个事件循环中聚焦搜索输入框
+            setTimeout(() => {
+              if (mobileSearchInput.value) {
+                mobileSearchInput.value.focus();
+              }
+            }, 100);
+          }
+        };
+
+        // 关闭手机搜索页面
+        const closeMobileSearch = () => {
+          showMobileSearchModal.value = false;
+          // 重新初始化图标
+          setTimeout(() => lucide.createIcons(), 100);
+        };
+
+        // 选择搜索结果
+        const selectSearchResult = (question) => {
+          currentDetailQuestion.value = question;
+          fromMobileSearch.value = true; // 标记从搜索页面进入详情页
+          showMobileSearchModal.value = false; // 隐藏搜索页面
+          showQuestionDetailModal.value = true;
+          // 加载保存的生成答案
+          loadGeneratedAnswers();
+          // 重新初始化图标
+          setTimeout(() => lucide.createIcons(), 100);
+        };
+
+        // 关闭题目详情页面
+        const closeQuestionDetail = () => {
+          showQuestionDetailModal.value = false;
+
+          // 如果是从手机搜索页面进入的，返回到搜索页面
+          if (fromMobileSearch.value && isMobileDevice.value) {
+            showMobileSearchModal.value = true;
+            // 重新聚焦搜索输入框
+            setTimeout(() => {
+              if (mobileSearchInput.value) {
+                mobileSearchInput.value.focus();
+              }
+            }, 100);
+          }
+
+          // 重置标记
+          fromMobileSearch.value = false;
+
+          // 重新初始化图标
+          setTimeout(() => lucide.createIcons(), 100);
+        };
+
         return {
+          showMobileSearchModal,
           currentTab,
           subjects,
           questions,
@@ -3154,6 +3300,12 @@
           removeNotification,
           getProgressColor,
           notify,
+          // 虚拟滚动相关
+          displayedQuestions,
+          hasMoreQuestions,
+          loadMoreQuestions,
+          getQuestionIndex,
+          pageSize,
           // 题目详情相关
           showQuestionDetailModal,
           currentDetailQuestion,
@@ -3198,11 +3350,12 @@
           triggerFileInput,
           handlePaste,
           processLocalText,
-          questionListContainer,
-          pagedQuestions,
-          // 懒加载分页相关
-          isLoadingMore,
-          isAllLoaded
+          openMobileSearch,
+          closeMobileSearch,
+          selectSearchResult,
+          mobileSearchInput,
+          fromMobileSearch,
+          closeQuestionDetail
         };
       }
     };
