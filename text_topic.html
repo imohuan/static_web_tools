@@ -411,11 +411,23 @@
           <div v-if="subjects.length > 0" class="space-y-4">
             <div class="flex items-center justify-between mb-4">
               <h2 class="text-lg font-semibold text-gray-800">我的科目</h2>
-              <button @click="showAddSubjectModal = true"
-                class="btn-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover-glow">
-                <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
-                添加科目
-              </button>
+              <div class="flex space-x-2">
+                <button @click="exportData"
+                  class="bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-600 transition-all">
+                  <i data-lucide="download" class="w-4 h-4 inline mr-1"></i>
+                  导出数据
+                </button>
+                <button @click="showImportModal = true"
+                  class="bg-green-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-600 transition-all">
+                  <i data-lucide="upload" class="w-4 h-4 inline mr-1"></i>
+                  导入数据
+                </button>
+                <button @click="showAddSubjectModal = true"
+                  class="btn-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover-glow">
+                  <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
+                  添加科目
+                </button>
+              </div>
             </div>
 
             <div class="space-y-3">
@@ -945,16 +957,11 @@
             </button>
             <h3 class="text-lg font-bold text-white">题目详情</h3>
           </div>
-          <div class="flex items-center space-x-2">
-            <button @mousedown="startDecreaseFontSize" @mouseup="stopFontSizeChange" @mouseleave="stopFontSizeChange"
-              class="text-white p-2 hover:bg-white/20 rounded-full">
-              <i data-lucide="minus" class="w-4 h-4"></i>
-            </button>
+          <div class="flex items-center space-x-3">
+            <i data-lucide="type" class="w-4 h-4 text-white"></i>
+            <input v-model="detailFontSize" type="range" min="8" max="48" step="1"
+              class="w-32 h-2 bg-white/30 rounded-lg appearance-none cursor-pointer accent-white">
             <span class="text-white text-sm">{{ detailFontSize }}px</span>
-            <button @mousedown="startIncreaseFontSize" @mouseup="stopFontSizeChange" @mouseleave="stopFontSizeChange"
-              class="text-white p-2 hover:bg-white/20 rounded-full">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-            </button>
           </div>
         </div>
 
@@ -1299,6 +1306,36 @@
         </div>
       </div>
     </div>
+
+    <!-- 导入数据弹窗 -->
+    <div v-if="showImportModal"
+      class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6 z-50">
+      <div class="bg-white rounded-3xl w-full max-w-md shadow-2xl bounce-in">
+        <div class="p-8">
+          <div class="text-center mb-6">
+            <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i data-lucide="upload" class="w-8 h-8 text-green-500"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">导入数据</h3>
+            <p class="text-gray-500 text-sm mt-1">请粘贴JSON格式的数据</p>
+          </div>
+
+          <textarea v-model="importDataText" placeholder="请粘贴JSON格式的数据..."
+            class="w-full h-64 p-4 border border-gray-200 rounded-2xl resize-none input-glow mb-6 font-mono text-sm"></textarea>
+
+          <div class="flex space-x-3">
+            <button @click="showImportModal = false"
+              class="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-50 transition-all font-medium">
+              取消
+            </button>
+            <button @click="importData"
+              class="flex-1 py-3 px-4 bg-green-500 text-white rounded-2xl hover:bg-green-600 transition-all font-medium">
+              确认导入
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -1368,6 +1405,8 @@
         const availableTargetSubjects = ref([]);
         const deleteSourceAfterTransfer = ref(false);
         const deleteSourceSubject = ref(false);
+        const showImportModal = ref(false);
+        const importDataText = ref('');
 
         // 题目详情相关状态
         const showQuestionDetailModal = ref(false);
@@ -2321,6 +2360,97 @@
           }
         };
 
+        // 导出数据为JSON
+        const exportData = () => {
+          try {
+            // 准备导出的数据
+            const exportData = {
+              subjects: subjects.value,
+              questions: questions.value,
+              version: '1.0'
+            };
+
+            // 转换为JSON字符串
+            const jsonData = JSON.stringify(exportData, null, 2);
+
+            // 创建Blob对象
+            const blob = new Blob([jsonData], { type: 'application/json' });
+
+            // 创建下载链接
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `智能题库_${new Date().toISOString().split('T')[0]}.json`;
+
+            // 触发下载
+            document.body.appendChild(a);
+            a.click();
+
+            // 清理
+            setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }, 0);
+
+            notify.success('数据导出成功');
+          } catch (error) {
+            console.error('导出数据失败:', error);
+            notify.error('导出数据失败，请稍后重试');
+          }
+        };
+
+        // 导入JSON数据
+        const importData = () => {
+          try {
+            if (!importDataText.value.trim()) {
+              notify.warning('请输入要导入的JSON数据');
+              return;
+            }
+
+            // 解析JSON数据
+            const data = JSON.parse(importDataText.value);
+
+            // 验证数据格式
+            if (!data.subjects || !Array.isArray(data.subjects) || !data.questions || !Array.isArray(data.questions)) {
+              notify.error('数据格式不正确，请检查后重试');
+              return;
+            }
+
+            // 确认是否覆盖现有数据
+            notify.confirm(
+              `确定要导入数据吗？这将覆盖现有的${subjects.value.length}个科目和${questions.value.length}道题目。`,
+              () => {
+                // 用户确认，执行导入
+                subjects.value = data.subjects;
+                questions.value = data.questions;
+
+                // 确保所有题目都有answers数组
+                questions.value.forEach(q => {
+                  if (!q.answers) {
+                    q.answers = [];
+                  }
+                });
+
+                // 保存到本地存储
+                saveToLocalStorage();
+
+                // 关闭弹窗并重置输入
+                showImportModal.value = false;
+                importDataText.value = '';
+
+                notify.success(`成功导入${subjects.value.length}个科目和${questions.value.length}道题目`);
+              },
+              () => {
+                // 用户取消，不执行任何操作
+              },
+              '确认导入'
+            );
+          } catch (error) {
+            console.error('导入数据失败:', error);
+            notify.error('导入数据失败，请检查JSON格式是否正确');
+          }
+        };
+
         return {
           currentTab,
           subjects,
@@ -2395,7 +2525,11 @@
           showCustomPromptModal,
           customPrompt,
           processedCustomPrompt,
-          generateAnswerWithCustomPrompt
+          generateAnswerWithCustomPrompt,
+          exportData,
+          importData,
+          showImportModal,
+          importDataText
         };
       }
     };
