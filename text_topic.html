@@ -469,11 +469,18 @@
             </div>
             <h3 class="text-xl font-semibold text-gray-800 mb-2">开始您的学习之旅</h3>
             <p class="text-gray-500 mb-8 max-w-sm mx-auto">添加您的第一个学科，开始构建专属题库</p>
-            <button @click="showAddSubjectModal = true"
-              class="btn-primary text-white px-8 py-4 rounded-2xl text-lg font-medium hover-glow bounce-in">
-              <i data-lucide="plus" class="w-5 h-5 inline mr-2"></i>
-              创建科目
-            </button>
+            <div class="flex flex-wrap justify-center gap-4">
+              <button @click="showAddSubjectModal = true"
+                class="btn-primary text-white px-8 py-4 rounded-2xl text-lg font-medium hover-glow bounce-in">
+                <i data-lucide="plus" class="w-5 h-5 inline mr-2"></i>
+                创建科目
+              </button>
+              <button @click="showImportModal = true"
+                class="bg-green-500 text-white px-8 py-4 rounded-2xl text-lg font-medium hover:bg-green-600 transition-all bounce-in">
+                <i data-lucide="upload" class="w-5 h-5 inline mr-2"></i>
+                导入数据
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1317,11 +1324,48 @@
               <i data-lucide="upload" class="w-8 h-8 text-green-500"></i>
             </div>
             <h3 class="text-xl font-bold text-gray-800">导入数据</h3>
-            <p class="text-gray-500 text-sm mt-1">请粘贴JSON格式的数据</p>
+            <p class="text-gray-500 text-sm mt-1">请选择导入方式</p>
           </div>
 
-          <textarea v-model="importDataText" placeholder="请粘贴JSON格式的数据..."
-            class="w-full h-64 p-4 border border-gray-200 rounded-2xl resize-none input-glow mb-6 font-mono text-sm"></textarea>
+          <!-- 导入方式选择 -->
+          <div class="mb-6">
+            <div class="flex space-x-2">
+              <button @click="importMethod = 'file'" :class="[
+                'flex-1 py-3 px-4 rounded-xl font-medium transition-all',
+                importMethod === 'file' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+              ]">
+                <i data-lucide="file" class="w-4 h-4 inline mr-1"></i>
+                文件导入
+              </button>
+              <button @click="importMethod = 'text'" :class="[
+                'flex-1 py-3 px-4 rounded-xl font-medium transition-all',
+                importMethod === 'text' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+              ]">
+                <i data-lucide="code" class="w-4 h-4 inline mr-1"></i>
+                JSON文本
+              </button>
+            </div>
+          </div>
+
+          <!-- 文件导入 -->
+          <div v-if="importMethod === 'file'" class="mb-6">
+            <input type="file" ref="importFileInput" @change="handleFileImport" accept=".json" class="hidden">
+            <div @click="triggerFileInput"
+              class="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center cursor-pointer hover:border-green-400 hover:bg-green-50 transition-all">
+              <i data-lucide="file-json" class="w-12 h-12 text-gray-400 mx-auto mb-4"></i>
+              <h4 class="text-base font-medium text-gray-800 mb-2">点击选择JSON文件</h4>
+              <p class="text-gray-500 text-sm">支持.json格式</p>
+              <div v-if="selectedFileName" class="mt-4 p-2 bg-green-50 rounded-lg text-green-700 text-sm">
+                已选择: {{ selectedFileName }}
+              </div>
+            </div>
+          </div>
+
+          <!-- JSON文本导入 -->
+          <div v-if="importMethod === 'text'" class="mb-6">
+            <textarea v-model="importDataText" placeholder="请粘贴JSON格式的数据..."
+              class="w-full h-64 p-4 border border-gray-200 rounded-2xl resize-none input-glow font-mono text-sm"></textarea>
+          </div>
 
           <div class="flex space-x-3">
             <button @click="showImportModal = false"
@@ -1407,6 +1451,9 @@
         const deleteSourceSubject = ref(false);
         const showImportModal = ref(false);
         const importDataText = ref('');
+        const importMethod = ref('file');
+        const importFileInput = ref(null);
+        const selectedFileName = ref('');
 
         // 题目详情相关状态
         const showQuestionDetailModal = ref(false);
@@ -2402,10 +2449,24 @@
         // 导入JSON数据
         const importData = () => {
           try {
-            if (!importDataText.value.trim()) {
+            // 检查是否有数据可导入
+            if (importMethod.value === 'text' && !importDataText.value.trim()) {
               notify.warning('请输入要导入的JSON数据');
               return;
             }
+
+            if (importMethod.value === 'file' && !selectedFileName.value) {
+              notify.warning('请选择要导入的JSON文件');
+              return;
+            }
+
+            // 确保文件内容已经读取
+            if (importMethod.value === 'file' && !importDataText.value.trim()) {
+              notify.warning('文件内容读取中，请稍候再试');
+              return;
+            }
+
+            console.log('准备导入数据，数据长度:', importDataText.value.length);
 
             // 解析JSON数据
             const data = JSON.parse(importDataText.value);
@@ -2417,8 +2478,12 @@
             }
 
             // 确认是否覆盖现有数据
+            const confirmMessage = subjects.value.length > 0 ?
+              `确定要导入数据吗？这将覆盖现有的${subjects.value.length}个科目和${questions.value.length}道题目。` :
+              `确定要导入${data.subjects.length}个科目和${data.questions.length}道题目吗？`;
+
             notify.confirm(
-              `确定要导入数据吗？这将覆盖现有的${subjects.value.length}个科目和${questions.value.length}道题目。`,
+              confirmMessage,
               () => {
                 // 用户确认，执行导入
                 subjects.value = data.subjects;
@@ -2437,6 +2502,10 @@
                 // 关闭弹窗并重置输入
                 showImportModal.value = false;
                 importDataText.value = '';
+                selectedFileName.value = '';
+                if (importFileInput.value) {
+                  importFileInput.value.value = '';
+                }
 
                 notify.success(`成功导入${subjects.value.length}个科目和${questions.value.length}道题目`);
               },
@@ -2448,6 +2517,58 @@
           } catch (error) {
             console.error('导入数据失败:', error);
             notify.error('导入数据失败，请检查JSON格式是否正确');
+          }
+        };
+
+        // 处理文件导入
+        const handleFileImport = (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            // 检查文件大小（限制为10MB）
+            if (file.size > 10 * 1024 * 1024) {
+              notify.error('文件大小不能超过10MB');
+              if (importFileInput.value) {
+                importFileInput.value.value = '';
+              }
+              selectedFileName.value = '';
+              return;
+            }
+
+            // 检查文件类型
+            if (!file.type.startsWith('application/json') && !file.name.toLowerCase().endsWith('.json')) {
+              notify.error('请上传JSON文件');
+              if (importFileInput.value) {
+                importFileInput.value.value = '';
+              }
+              selectedFileName.value = '';
+              return;
+            }
+
+            selectedFileName.value = file.name;
+            console.log('已选择文件:', selectedFileName.value);
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              // 将文件转换为JSON格式
+              importDataText.value = e.target.result;
+              console.log('文件内容已读取，长度:', importDataText.value.length);
+            };
+            reader.onerror = (e) => {
+              console.error('文件读取失败:', e);
+              notify.error('文件读取失败，请重试');
+              selectedFileName.value = '';
+            };
+            reader.readAsText(file);
+          }
+        };
+
+        // 触发文件选择对话框
+        const triggerFileInput = () => {
+          if (importFileInput.value) {
+            importFileInput.value.click();
+          } else {
+            console.error('文件输入引用未设置');
+            notify.error('无法打开文件选择对话框，请刷新页面重试');
           }
         };
 
@@ -2529,7 +2650,12 @@
           exportData,
           importData,
           showImportModal,
-          importDataText
+          importDataText,
+          importMethod,
+          importFileInput,
+          selectedFileName,
+          handleFileImport,
+          triggerFileInput
         };
       }
     };
