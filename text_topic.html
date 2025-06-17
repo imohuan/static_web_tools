@@ -513,7 +513,7 @@
       <div v-show="currentTab === 'questions'"
         class="h-full flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden">
         <!-- 题目列表容器，使用overflow-auto使其可滚动 -->
-        <div class="flex-1 overflow-auto relative">
+        <div class="flex-1 overflow-auto relative" ref="questionListContainer">
           <!-- 标题部分（可滚动） -->
           <div class="gradient-bg px-6 pt-8 pb-6">
             <div class="mb-4">
@@ -588,8 +588,8 @@
 
           <!-- 题目列表 -->
           <div class="w-full px-6 pb-20">
-            <div v-if="filteredQuestions.length > 0" class="space-y-4">
-              <div v-for="(question, index) in filteredQuestions" :key="index"
+            <div v-if="pagedQuestions.length > 0" class="space-y-4">
+              <div v-for="(question, index) in pagedQuestions" :key="index"
                 class="bg-white rounded-2xl shadow-sm hover-rise transition-all duration-300">
                 <div class="p-6">
                   <!-- 题目标签 -->
@@ -643,6 +643,11 @@
                     </div>
                   </div>
                 </div>
+              </div>
+              <!-- 加载更多/全部加载完毕提示区域 -->
+              <div class="text-center py-4 text-gray-400 text-sm select-none">
+                <template v-if="isLoadingMore">正在加载更多...</template>
+                <template v-else-if="isAllLoaded && pagedQuestions.length > 0">已全部加载完毕</template>
               </div>
             </div>
 
@@ -2489,6 +2494,91 @@
           showAddQuestionModal.value = false;
         };
 
+        // ========== 懒加载分页相关状态 ==========
+        /**
+         * @type {import('vue').Ref<number>} 当前已加载的题目数量
+         */
+        const questionPageSize = 20; // 每页加载数量
+        const loadedQuestionCount = ref(questionPageSize); // 当前已加载数量
+        /**
+         * @type {import('vue').Ref<HTMLElement|null>} 题目列表容器ref
+         */
+        const questionListContainer = ref(null);
+        /**
+         * @type {import('vue').ComputedRef<Array>} 当前分页后实际渲染的题目
+         */
+        const pagedQuestions = computed(() => filteredQuestions.value.slice(0, loadedQuestionCount.value));
+        /**
+         * @function resetQuestionPagination
+         * @description 重置分页（如切换筛选/搜索时）
+         */
+        function resetQuestionPagination() {
+          loadedQuestionCount.value = questionPageSize;
+        }
+        // 监听筛选/搜索变化时重置分页
+        watch([filteredQuestions, searchQuery, selectedCategory, selectedSubjectFilter], resetQuestionPagination);
+        /**
+         * @type {import('vue').Ref<boolean>} 是否正在加载更多
+         */
+        const isLoadingMore = ref(false);
+        /**
+         * @type {import('vue').ComputedRef<boolean>} 是否已全部加载完毕
+         */
+        const isAllLoaded = computed(() => loadedQuestionCount.value >= filteredQuestions.value.length);
+        /**
+         * @type {number} 上次提示的题目数量
+         */
+        let lastNotifiedCount = 0;
+        /**
+         * @function handleQuestionListScroll
+         * @description 懒加载滚动监听，距离底部100px时加载更多，并显示提示
+         */
+        function handleQuestionListScroll() {
+          const el = questionListContainer.value;
+          if (!el) return;
+          // 距离底部100px以内时加载
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 100) {
+            if (loadedQuestionCount.value < filteredQuestions.value.length) {
+              if (!isLoadingMore.value) {
+                isLoadingMore.value = true;
+                // notify.info('正在加载更多...');
+                setTimeout(() => {
+                  loadedQuestionCount.value = Math.min(
+                    loadedQuestionCount.value + questionPageSize,
+                    filteredQuestions.value.length
+                  );
+                  isLoadingMore.value = false;
+                  // 如果加载后全部加载完，给出提示
+                  if (loadedQuestionCount.value >= filteredQuestions.value.length && lastNotifiedCount !== loadedQuestionCount.value) {
+                    // notify.info('已全部加载完毕');
+                    lastNotifiedCount = loadedQuestionCount.value;
+                  }
+                }, 300); // 模拟加载延迟
+              }
+            } else if (lastNotifiedCount !== loadedQuestionCount.value) {
+              // 已全部加载完，且未提示过
+              notify.info('已全部加载完毕');
+              lastNotifiedCount = loadedQuestionCount.value;
+            }
+          }
+        }
+        // 页面挂载后绑定滚动事件
+        onMounted(() => {
+          loadFromLocalStorage();
+          loadConfig();
+          setTimeout(() => lucide.createIcons(), 100);
+          // 绑定滚动事件
+          if (questionListContainer.value) {
+            questionListContainer.value.addEventListener('scroll', handleQuestionListScroll);
+          }
+        });
+        // 切换tab时重新绑定滚动事件（防止ref丢失）
+        watch(currentTab, () => {
+          if (currentTab.value === 'questions' && questionListContainer.value) {
+            questionListContainer.value.addEventListener('scroll', handleQuestionListScroll);
+          }
+        });
+
         // 生命周期钩子
         onMounted(() => {
           loadFromLocalStorage();
@@ -3107,7 +3197,12 @@
           handleFileImport,
           triggerFileInput,
           handlePaste,
-          processLocalText
+          processLocalText,
+          questionListContainer,
+          pagedQuestions,
+          // 懒加载分页相关
+          isLoadingMore,
+          isAllLoaded
         };
       }
     };
