@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coze 文件上传演示</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#1e40af',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'bounce-in': 'bounceIn 0.6s ease-out',
+                        'pulse-glow': 'pulseGlow 2s infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes bounceIn {
+            0% {
+                transform: scale(0.3);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+
+            70% {
+                transform: scale(0.9);
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 40px rgba(59, 130, 246, 0.8);
+            }
+        }
+
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background-color: rgba(59, 130, 246, 0.1) !important;
+            transform: scale(1.02);
+        }
+
+        .upload-progress {
+            background: linear-gradient(90deg, #3b82f6, #1e40af);
+        }
+
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .status-indicator {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .status-indicator::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .status-indicator.success::before {
+            left: 100%;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-blue-50 via-white to-indigo-50 min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <header class="glass-effect border-b border-blue-200 sticky top-0 z-50">
+            <div class="container mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div
+                            class="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                            <i class="fas fa-cloud-upload-alt text-white text-lg"></i>
+                        </div>
+                        <h1
+                            class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                            Coze 文件上传演示
+                        </h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2 text-sm text-gray-600">
+                            <i class="fas fa-shield-alt text-green-500"></i>
+                            <span>安全连接</span>
+                        </div>
+                        <button @click="showApiInfo = !showApiInfo"
+                            class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
+                            <i class="fas fa-info-circle mr-2"></i>API 信息
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="container mx-auto px-6 py-8">
+            <!-- API Information Modal -->
+            <div v-if="showApiInfo"
+                class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 animate-bounce-in">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-2xl font-bold text-gray-800 flex items-center">
+                                <i class="fas fa-code mr-3 text-blue-500"></i>API 配置信息
+                            </h3>
+                            <button @click="showApiInfo = false" class="text-gray-400 hover:text-gray-600 text-2xl">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="code-block p-4 rounded-lg">
+                            <div class="text-green-400 mb-2">// API 端点</div>
+                            <div class="text-yellow-300">const apiUrl = <span
+                                    class="text-green-300">'https://api.coze.cn/v1/files/upload'</span>;</div>
+                        </div>
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                            <div class="flex items-start">
+                                <i class="fas fa-exclamation-triangle text-yellow-500 mt-1 mr-3"></i>
+                                <div>
+                                    <p class="font-semibold text-yellow-800">安全提示</p>
+                                    <p class="text-yellow-700 text-sm mt-1">
+                                        生产环境中请将 API Token 存储在服务器端，避免暴露在客户端代码中。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 animate-fade-in">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-2xl shadow-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100">总上传数</p>
+                            <p class="text-3xl font-bold">{{ uploadStats.total }}</p>
+                        </div>
+                        <i class="fas fa-upload text-3xl text-blue-200"></i>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-2xl shadow-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-100">成功上传</p>
+                            <p class="text-3xl font-bold">{{ uploadStats.success }}</p>
+                        </div>
+                        <i class="fas fa-check-circle text-3xl text-green-200"></i>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-2xl shadow-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-red-100">失败次数</p>
+                            <p class="text-3xl font-bold">{{ uploadStats.failed }}</p>
+                        </div>
+                        <i class="fas fa-times-circle text-3xl text-red-200"></i>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-2xl shadow-lg">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-purple-100">数据传输</p>
+                            <p class="text-2xl font-bold">{{ formatBytes(uploadStats.totalSize) }}</p>
+                        </div>
+                        <i class="fas fa-database text-3xl text-purple-200"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Upload Area -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-2xl shadow-xl p-8 animate-fade-in">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                            <i class="fas fa-cloud-upload-alt mr-3 text-blue-500"></i>
+                            文件上传区域
+                        </h2>
+
+                        <!-- Drag & Drop Area -->
+                        <div @drop="handleDrop" @dragover.prevent @dragenter.prevent @dragleave="handleDragLeave"
+                            @dragover="handleDragOver"
+                            :class="['border-3 border-dashed border-gray-300 rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer hover:border-blue-400 hover:bg-blue-50', dragActive ? 'drag-over' : '']">
+
+                            <div v-if="!selectedFile" class="space-y-4" @click="$refs.fileInput.click()">
+                                <div
+                                    class="w-20 h-20 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto">
+                                    <i class="fas fa-cloud-upload-alt text-4xl text-blue-500"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xl font-semibold text-gray-700">拖拽文件到这里</p>
+                                    <p class="text-gray-500 mt-2">或者点击选择文件</p>
+                                </div>
+                                <div class="flex flex-wrap justify-center gap-2 text-sm text-gray-400">
+                                    <span class="px-3 py-1 bg-gray-100 rounded-full">图片</span>
+                                    <span class="px-3 py-1 bg-gray-100 rounded-full">文档</span>
+                                    <span class="px-3 py-1 bg-gray-100 rounded-full">音频</span>
+                                    <span class="px-3 py-1 bg-gray-100 rounded-full">视频</span>
+                                </div>
+                            </div>
+
+                            <!-- Selected File Info -->
+                            <div v-if="selectedFile && !isUploading" class="space-y-4 animate-bounce-in">
+                                <div
+                                    class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                                    <i :class="getFileIcon(selectedFile)" class="text-4xl text-green-600"></i>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-gray-800 truncate px-4">{{ selectedFile.name }}</p>
+                                    <p class="text-gray-500">{{ formatBytes(selectedFile.size) }}</p>
+                                </div>
+                                <div class="flex justify-center space-x-4">
+                                    <button @click="uploadFile"
+                                        class="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl">
+                                        <i class="fas fa-upload mr-2"></i>开始上传
+                                    </button>
+                                    <button @click="clearFile"
+                                        class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                                        <i class="fas fa-times mr-2"></i>取消
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <input ref="fileInput" type="file" @change="handleFileSelect" class="hidden" accept="*/*">
+                    </div>
+
+                    <!-- Upload Progress -->
+                    <div v-if="isUploading" class="bg-white rounded-2xl shadow-xl p-8 animate-slide-up">
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-semibold text-gray-800">上传进度</h3>
+                                <span class="text-blue-600 font-bold">{{ uploadProgress }}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                                <div class="upload-progress h-full rounded-full transition-all duration-500 relative animate-pulse-glow"
+                                    :style="{ width: uploadProgress + '%' }">
+                                    <div
+                                        class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-center space-x-2 text-blue-600">
+                                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                                <span>正在上传...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div class="space-y-6">
+                    <!-- Current Upload Result -->
+                    <div v-if="uploadResult" class="bg-white rounded-2xl shadow-xl p-8 animate-fade-in">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                            <i
+                                :class="[uploadResult.success ? 'fas fa-check-circle text-green-500' : 'fas fa-times-circle text-red-500', 'mr-3']"></i>
+                            上传结果
+                        </h2>
+
+                        <div
+                            :class="[uploadResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200', 'border rounded-xl p-6']">
+                            <div v-if="uploadResult.success" class="space-y-4">
+                                <div class="status-indicator success bg-green-100 p-4 rounded-lg">
+                                    <div class="flex items-center text-green-800">
+                                        <i class="fas fa-check-circle mr-3 text-2xl"></i>
+                                        <span class="font-semibold text-lg">上传成功！</span>
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">文件ID:</span>
+                                        <span class="font-mono bg-gray-100 px-2 py-1 rounded text-sm">{{
+                                            uploadResult.data.id }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">文件名:</span>
+                                        <span class="truncate ml-4">{{ uploadResult.data.file_name }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">文件大小:</span>
+                                        <span>{{ formatBytes(uploadResult.data.file_size) }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">上传时间:</span>
+                                        <span>{{ new Date(uploadResult.data.created_at * 1000).toLocaleString()
+                                            }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-else class="space-y-4">
+                                <div class="bg-red-100 p-4 rounded-lg">
+                                    <div class="flex items-center text-red-800">
+                                        <i class="fas fa-exclamation-triangle mr-3 text-2xl"></i>
+                                        <span class="font-semibold text-lg">上传失败</span>
+                                    </div>
+                                </div>
+                                <div class="text-red-700">
+                                    <p class="font-semibold">错误信息:</p>
+                                    <p class="mt-2 bg-red-100 p-3 rounded font-mono text-sm">{{ uploadResult.error }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload History -->
+                    <div v-if="uploadHistory.length > 0" class="bg-white rounded-2xl shadow-xl p-8 animate-fade-in">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                                <i class="fas fa-history mr-3 text-purple-500"></i>
+                                上传历史
+                            </h2>
+                            <button @click="clearHistory"
+                                class="px-4 py-2 text-gray-500 hover:text-red-500 transition-colors">
+                                <i class="fas fa-trash mr-2"></i>清空历史
+                            </button>
+                        </div>
+
+                        <div class="space-y-4 max-h-96 overflow-y-auto">
+                            <div v-for="(item, index) in uploadHistory" :key="index"
+                                class="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                                <div class="flex items-center space-x-4">
+                                    <div
+                                        :class="[item.success ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600', 'w-10 h-10 rounded-full flex items-center justify-center']">
+                                        <i :class="item.success ? 'fas fa-check' : 'fas fa-times'"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-semibold text-gray-800 truncate max-w-xs">{{ item.fileName }}</p>
+                                        <p class="text-sm text-gray-500">{{ formatBytes(item.fileSize) }} • {{
+                                            item.timestamp }}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span
+                                        :class="[item.success ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100', 'px-3 py-1 rounded-full text-sm font-semibold']">
+                                        {{ item.success ? '成功' : '失败' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tips & Features -->
+                    <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl shadow-xl p-8 animate-fade-in">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-lightbulb mr-3 text-yellow-500"></i>
+                            功能特性
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="flex items-start space-x-3">
+                                <i class="fas fa-magic text-purple-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-gray-800">拖拽上传</p>
+                                    <p class="text-sm text-gray-600">支持直接拖拽文件上传</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3">
+                                <i class="fas fa-chart-line text-blue-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-gray-800">实时进度</p>
+                                    <p class="text-sm text-gray-600">显示上传进度和状态</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3">
+                                <i class="fas fa-file-alt text-green-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-gray-800">多格式支持</p>
+                                    <p class="text-sm text-gray-600">支持各种文件格式</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-3">
+                                <i class="fas fa-shield-alt text-red-500 mt-1"></i>
+                                <div>
+                                    <p class="font-semibold text-gray-800">安全传输</p>
+                                    <p class="text-sm text-gray-600">HTTPS 加密传输</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-50 border-t border-gray-200 py-8 mt-12">
+            <div class="container mx-auto px-6 text-center">
+                <div class="flex items-center justify-center space-x-6 text-gray-600">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-code"></i>
+                        <span>Vue 3 + Tailwind CSS</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-cloud"></i>
+                        <span>Coze API 演示</span>
+                    </div>
+                </div>
+                <p class="text-gray-500 mt-4">&copy; 2024 文件上传演示系统. 仅用于学习和演示目的.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, computed } = Vue;
+
+        createApp({
+            setup() {
+                // 响应式数据
+                const selectedFile = ref(null);
+                const isUploading = ref(false);
+                const uploadProgress = ref(0);
+                const uploadResult = ref(null);
+                const dragActive = ref(false);
+                const showApiInfo = ref(false);
+                const uploadHistory = ref([]);
+
+                // 统计数据
+                const uploadStats = reactive({
+                    total: 0,
+                    success: 0,
+                    failed: 0,
+                    totalSize: 0
+                });
+
+                /**
+                 * 日志工具 - 记录应用中的各种日志
+                 * @type {Object}
+                 */
+                const logger = {
+                    info: (message, ...args) => {
+                        console.log(`[INFO] ${message}`, ...args);
+                    },
+                    success: (message, ...args) => {
+                        console.log(`[SUCCESS] ${message}`, ...args);
+                    },
+                    warn: (message, ...args) => {
+                        console.warn(`[WARNING] ${message}`, ...args);
+                    },
+                    error: (message, ...args) => {
+                        console.error(`[ERROR] ${message}`, ...args);
+                    }
+                };
+
+                // API 配置
+                const apiConfig = {
+                    url: 'https://api.coze.cn/v1/files/upload',
+                    token: 'pat_xFzog6n08JTkmagiXDJenxqBm7fH7euZlh9Gct8icgQL6TfbZWCC1Mo5thfqdBhr'
+                };
+
+                /**
+                 * 上传文件到Coze API
+                 * @param {File} file - 要上传的文件对象
+                 * @returns {Promise<Response>} - 包含API响应的Promise
+                 */
+                async function uploadFileToCoze(file) {
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    try {
+                        // 记录开始上传
+                        logger.info('开始上传文件', file.name, '大小:', formatBytes(file.size));
+
+                        const response = await fetch(apiConfig.url, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${apiConfig.token}`,
+                            },
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            logger.error('上传失败, HTTP状态码:', response.status);
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        logger.success('上传请求成功, 状态码:', response.status);
+                        return response;
+                    } catch (error) {
+                        logger.error('上传文件时出错:', error);
+                        throw error;
+                    }
+                }
+
+                // 处理文件选择
+                const handleFileSelect = (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        selectedFile.value = file;
+                        uploadResult.value = null;
+                    }
+                };
+
+                // 处理拖拽
+                const handleDrop = (event) => {
+                    event.preventDefault();
+                    dragActive.value = false;
+
+                    const files = event.dataTransfer.files;
+                    if (files.length > 0) {
+                        selectedFile.value = files[0];
+                        uploadResult.value = null;
+                    }
+                };
+
+                const handleDragOver = (event) => {
+                    event.preventDefault();
+                    dragActive.value = true;
+                };
+
+                const handleDragLeave = (event) => {
+                    event.preventDefault();
+                    if (!event.currentTarget.contains(event.relatedTarget)) {
+                        dragActive.value = false;
+                    }
+                };
+
+                // 清除文件
+                const clearFile = () => {
+                    selectedFile.value = null;
+                    uploadResult.value = null;
+                    uploadProgress.value = 0;
+                };
+
+                // 上传文件
+                const uploadFile = async () => {
+                    if (!selectedFile.value) return;
+
+                    isUploading.value = true;
+                    uploadProgress.value = 0;
+                    uploadResult.value = null;
+
+                    // 模拟上传进度
+                    const progressInterval = setInterval(() => {
+                        if (uploadProgress.value < 90) {
+                            uploadProgress.value += Math.random() * 15;
+                        }
+                    }, 200);
+
+                    try {
+                        const response = await uploadFileToCoze(selectedFile.value);
+                        const data = await response.json();
+
+                        // 记录API响应
+                        logger.info('API响应数据:', data);
+
+                        // 完成进度
+                        uploadProgress.value = 100;
+
+                        // 检查API返回的格式并设置结果
+                        if (data.code === 0) {
+                            // API返回成功
+                            logger.success('上传成功, 文件ID:', data.data.id);
+
+                            uploadResult.value = {
+                                success: true,
+                                data: {
+                                    id: data.data.id,
+                                    file_name: data.data.file_name,
+                                    file_size: data.data.bytes,
+                                    created_at: data.data.created_at
+                                }
+                            };
+
+                            // 更新统计
+                            uploadStats.total++;
+                            uploadStats.success++;
+                            uploadStats.totalSize += selectedFile.value.size;
+
+                            // 添加到历史记录
+                            uploadHistory.value.unshift({
+                                fileName: selectedFile.value.name,
+                                fileSize: selectedFile.value.size,
+                                success: true,
+                                timestamp: new Date().toLocaleString()
+                            });
+                        } else {
+                            // API返回错误
+                            logger.error('API返回错误:', data.msg || '未知错误', '错误代码:', data.code);
+                            throw new Error(data.msg || '上传失败');
+                        }
+                    } catch (error) {
+                        uploadProgress.value = 100;
+
+                        // 记录错误
+                        logger.error('上传过程中发生错误:', error.message);
+
+                        uploadResult.value = {
+                            success: false,
+                            error: error.message
+                        };
+
+                        // 更新统计
+                        uploadStats.total++;
+                        uploadStats.failed++;
+
+                        // 添加到历史记录
+                        uploadHistory.value.unshift({
+                            fileName: selectedFile.value.name,
+                            fileSize: selectedFile.value.size,
+                            success: false,
+                            timestamp: new Date().toLocaleString()
+                        });
+                    } finally {
+                        clearInterval(progressInterval);
+                        isUploading.value = false;
+
+                        // 延迟清除文件选择
+                        setTimeout(() => {
+                            selectedFile.value = null;
+                        }, 2000);
+                    }
+                };
+
+                // 清空历史记录
+                const clearHistory = () => {
+                    uploadHistory.value = [];
+                };
+
+                // 格式化文件大小
+                const formatBytes = (bytes) => {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                };
+
+                // 获取文件图标
+                const getFileIcon = (file) => {
+                    const extension = file.name.split('.').pop().toLowerCase();
+                    const iconMap = {
+                        // 图片
+                        jpg: 'fas fa-image', jpeg: 'fas fa-image', png: 'fas fa-image', gif: 'fas fa-image',
+                        svg: 'fas fa-image', bmp: 'fas fa-image', webp: 'fas fa-image',
+                        // 文档
+                        pdf: 'fas fa-file-pdf', doc: 'fas fa-file-word', docx: 'fas fa-file-word',
+                        xls: 'fas fa-file-excel', xlsx: 'fas fa-file-excel',
+                        ppt: 'fas fa-file-powerpoint', pptx: 'fas fa-file-powerpoint',
+                        txt: 'fas fa-file-alt',
+                        // 音频
+                        mp3: 'fas fa-file-audio', wav: 'fas fa-file-audio', flac: 'fas fa-file-audio',
+                        aac: 'fas fa-file-audio', ogg: 'fas fa-file-audio',
+                        // 视频
+                        mp4: 'fas fa-file-video', avi: 'fas fa-file-video', mkv: 'fas fa-file-video',
+                        mov: 'fas fa-file-video', wmv: 'fas fa-file-video',
+                        // 压缩文件
+                        zip: 'fas fa-file-archive', rar: 'fas fa-file-archive', '7z': 'fas fa-file-archive',
+                        // 代码
+                        js: 'fas fa-file-code', html: 'fas fa-file-code', css: 'fas fa-file-code',
+                        php: 'fas fa-file-code', py: 'fas fa-file-code', java: 'fas fa-file-code',
+                    };
+
+                    return iconMap[extension] || 'fas fa-file';
+                };
+
+                return {
+                    selectedFile,
+                    isUploading,
+                    uploadProgress,
+                    uploadResult,
+                    dragActive,
+                    showApiInfo,
+                    uploadHistory,
+                    uploadStats,
+                    handleFileSelect,
+                    handleDrop,
+                    handleDragOver,
+                    handleDragLeave,
+                    clearFile,
+                    uploadFile,
+                    clearHistory,
+                    formatBytes,
+                    getFileIcon,
+                    logger
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCR API 测试页面</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+  <div id="app" class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
+    <!-- 头部 -->
+    <div class="max-w-4xl mx-auto mb-8">
+      <div class="text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">
+          <i class="fas fa-eye text-blue-600 mr-3"></i>OCR API 测试工具
+        </h1>
+        <p class="text-gray-600">上传图片或输入URL，快速体验OCR文字识别功能
+
+        <div class="inline-flex gap-2">
+          <a class=" underline text-blue-400" target="_blank" href="https://console.volcengine.com/home">火山引擎控制台</a>
+          <a class=" underline text-blue-400" target="_blank"
+            href="https://console.volcengine.com/iam/keymanage/">ApiKey获取</a>
+          <a class=" underline text-blue-400" target="_blank"
+            href="https://www.volcengine.com/docs/6790/117730#%E5%9F%BA%E6%9C%AC%E4%BF%A1%E6%81%AF">文档</a>
+        </div>
+
+        </p>
+      </div>
+    </div>
+
+    <!-- API 配置区域 -->
+    <div class="max-w-4xl mx-auto mb-8">
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-4">
+          <i class="fas fa-cog text-gray-600 mr-2"></i>
+          <h2 class="text-lg font-semibold text-gray-800">API 配置</h2>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Access Key ID</label>
+            <input v-model="config.accessKeyId" type="text" placeholder="请输入Access Key ID"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Secret Access Key</label>
+            <input v-model="config.secretAccessKey" type="password" placeholder="请输入Secret Access Key"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主要内容区域 -->
+    <div class="max-w-4xl mx-auto">
+      <div class="grid lg:grid-cols-2 gap-8">
+
+        <!-- 左侧：输入区域 -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+          <div class="flex items-center mb-6">
+            <i class="fas fa-upload text-blue-600 mr-2"></i>
+            <h2 class="text-lg font-semibold text-gray-800">图片输入</h2>
+          </div>
+
+          <!-- 选项卡 -->
+          <div class="flex mb-6 bg-gray-100 rounded-lg p-1">
+            <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id" :class="[
+                                'flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200',
+                                activeTab === tab.id 
+                                    ? 'bg-white text-blue-600 shadow-sm' 
+                                    : 'text-gray-600 hover:text-gray-800'
+                            ]">
+              <i :class="tab.icon" class="mr-2"></i>
+              {{ tab.name }}
+            </button>
+          </div>
+
+          <!-- 文件上传 -->
+          <div v-if="activeTab === 'file'" class="space-y-4">
+            <div @drop="handleDrop" @dragover="handleDragOver" @dragenter="handleDragEnter" @dragleave="handleDragLeave"
+              :class="[
+                                'border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200',
+                                isDragging 
+                                    ? 'border-blue-400 bg-blue-50' 
+                                    : 'border-gray-300 hover:border-gray-400'
+                            ]">
+              <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-4"></i>
+              <p class="text-gray-600 mb-2">拖拽图片到此处或点击选择文件</p>
+              <input ref="fileInput" type="file" accept="image/*" @change="handleFileSelect" class="hidden">
+              <button @click="$refs.fileInput.click()"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                选择文件
+              </button>
+            </div>
+
+            <!-- 预览图片 -->
+            <div v-if="selectedFile" class="mt-4">
+              <img :src="previewUrl" alt="预览图片" class="max-w-full h-40 object-contain mx-auto rounded-lg border">
+              <p class="text-sm text-gray-600 mt-2 text-center">{{ selectedFile.name }}</p>
+            </div>
+          </div>
+
+          <!-- URL 输入 -->
+          <div v-if="activeTab === 'url'" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">图片URL</label>
+              <input v-model="imageUrl" type="url" placeholder="https://example.com/image.jpg"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+            </div>
+
+            <!-- URL 预览 -->
+            <div v-if="imageUrl" class="mt-4">
+              <img :src="imageUrl" alt="URL图片预览" @error="handleImageError"
+                class="max-w-full h-40 object-contain mx-auto rounded-lg border">
+            </div>
+          </div>
+
+          <!-- 高级选项 -->
+          <details class="mt-6">
+            <summary class="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
+              <i class="fas fa-sliders-h mr-2"></i>高级选项
+            </summary>
+            <div class="mt-4 space-y-4 pl-4 border-l-2 border-gray-200">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">识别模式</label>
+                  <select v-model="apiOptions.mode"
+                    class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500">
+                    <option value="default">默认</option>
+                    <option value="text_block">文本块</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">过滤阈值</label>
+                  <input v-model="apiOptions.filter_thresh" type="number" min="0" max="100"
+                    class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500">
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- 识别按钮 -->
+          <button @click="performOCR" :disabled="!canPerformOCR || isLoading" :class="[
+                            'w-full mt-6 py-3 rounded-lg font-medium transition-all duration-200',
+                            canPerformOCR && !isLoading
+                                ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg transform hover:-translate-y-0.5'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        ]">
+            <i v-if="isLoading" class="fas fa-spinner fa-spin mr-2"></i>
+            <i v-else class="fas fa-magic mr-2"></i>
+            {{ isLoading ? '识别中...' : '开始识别' }}
+          </button>
+
+          <!-- 调试信息 -->
+          <div v-if="debugInfo" class="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
+            <details>
+              <summary class="cursor-pointer font-medium text-gray-700">调试信息</summary>
+              <pre class="mt-2 text-gray-600 whitespace-pre-wrap">{{ debugInfo }}</pre>
+            </details>
+          </div>
+        </div>
+
+        <!-- 右侧：结果区域 -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center">
+              <i class="fas fa-file-alt text-green-600 mr-2"></i>
+              <h2 class="text-lg font-semibold text-gray-800">识别结果</h2>
+            </div>
+            <div v-if="result && result.success" class="flex items-center text-sm text-gray-600">
+              <i class="fas fa-clock mr-1"></i>
+              <span>{{ recognitionTime }}ms</span>
+            </div>
+          </div>
+
+          <!-- 结果显示 -->
+          <div class="space-y-4">
+            <!-- 成功结果 -->
+            <div v-if="result && result.success" class="space-y-4">
+              <!-- 状态提示 -->
+              <div class="flex items-center p-3 bg-green-50 border border-green-200 rounded-lg">
+                <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                <span class="text-green-800 text-sm">识别成功！共识别到 {{ result.data.line_texts.length }} 行文本</span>
+              </div>
+
+              <!-- 识别文本 -->
+              <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="font-medium text-gray-800 mb-3 flex items-center">
+                  <i class="fas fa-font mr-2"></i>识别文本
+                  <button @click="copyText"
+                    class="ml-auto px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    title="复制文本">
+                    <i class="fas fa-copy mr-1"></i>复制
+                  </button>
+                </h3>
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                  <p v-for="(text, index) in result.data.line_texts" :key="index"
+                    class="text-gray-800 p-2 bg-white rounded border-l-2 border-blue-200">
+                    {{ text }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- 详细信息 -->
+              <details class="border border-gray-200 rounded-lg">
+                <summary
+                  class="cursor-pointer p-3 bg-gray-50 font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+                  <i class="fas fa-info-circle mr-2"></i>详细信息
+                </summary>
+                <div class="p-4 space-y-3 text-sm">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <span class="font-medium text-gray-600">请求ID:</span>
+                      <p class="text-gray-800 font-mono text-xs">{{ result.request_id }}</p>
+                    </div>
+                    <div>
+                      <span class="font-medium text-gray-600">文本行数:</span>
+                      <p class="text-gray-800">{{ result.data.line_texts.length }}</p>
+                    </div>
+                  </div>
+                  <div v-if="result.data.line_probs && result.data.line_probs.length > 0">
+                    <span class="font-medium text-gray-600">置信度分布:</span>
+                    <div class="mt-2 space-y-1">
+                      <div v-for="(prob, index) in result.data.line_probs.slice(0, 5)" :key="index"
+                        class="flex items-center">
+                        <span class="w-8 text-xs text-gray-500">{{ index + 1 }}.</span>
+                        <div class="flex-1 bg-gray-200 rounded-full h-2 mx-2">
+                          <div :style="{ width: (prob * 100) + '%' }" class="bg-blue-600 h-2 rounded-full"></div>
+                        </div>
+                        <span class="text-xs text-gray-600 w-12">{{ (prob * 100).toFixed(1) }}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <!-- 错误结果 -->
+            <div v-else-if="result && !result.success" class="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div class="flex items-center mb-2">
+                <i class="fas fa-exclamation-circle text-red-600 mr-2"></i>
+                <span class="font-medium text-red-800">识别失败</span>
+              </div>
+              <p class="text-red-700 text-sm">{{ result.error }}</p>
+              <p v-if="result.code" class="text-red-600 text-xs mt-1">错误代码: {{ result.code }}</p>
+              <p v-if="result.httpStatus" class="text-red-600 text-xs mt-1">HTTP状态: {{ result.httpStatus }}</p>
+            </div>
+
+            <!-- 等待状态 -->
+            <div v-else-if="!result" class="text-center py-12">
+              <i class="fas fa-image text-4xl text-gray-300 mb-4"></i>
+              <p class="text-gray-500">请上传图片或输入URL开始识别</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div v-if="toast.show" :class="[
+                'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300',
+                toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white',
+                toast.show ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+            ]">
+      <i :class="toast.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'" class="mr-2"></i>
+      {{ toast.message }}
+    </div>
+  </div>
+
+  <script>
+    // 修复后的OCR调用类
+    class VOCRClient {
+      constructor(accessKeyId, secretAccessKey, region = 'cn-north-1') {
+        this.accessKeyId = accessKeyId;
+        this.secretAccessKey = secretAccessKey;
+        this.region = region;
+        this.service = 'cv';
+        this.host = 'visual.volcengineapi.com';
+        this.endpoint = `https://${this.host}`;
+      }
+
+      // 生成UTC时间戳
+      getTimestamp() {
+        const now = new Date();
+        return now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+      }
+
+      // 生成短日期
+      getShortDate(timestamp) {
+        return timestamp.split('T')[0];
+      }
+
+      // HMAC-SHA256签名
+      async hmacSha256(key, message) {
+        const encoder = new TextEncoder();
+        const keyData = typeof key === 'string' ? encoder.encode(key) : key;
+        const messageData = encoder.encode(message);
+
+        const cryptoKey = await crypto.subtle.importKey(
+          'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+        );
+
+        const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+        return new Uint8Array(signature);
+      }
+
+      // SHA256哈希
+      async sha256(message) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(hashBuffer))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+      }
+
+      // 转十六进制字符串
+      toHex(buffer) {
+        return Array.from(buffer).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+
+      // 生成规范化请求
+      async createCanonicalRequest(method, uri, query, headers, payload) {
+        const sortedHeaders = Object.keys(headers)
+          .sort()
+          .map(key => `${key.toLowerCase()}:${headers[key]}`)
+          .join('\n');
+
+        const signedHeaders = Object.keys(headers)
+          .sort()
+          .map(key => key.toLowerCase())
+          .join(';');
+
+        const hashedPayload = await this.sha256(payload);
+
+        const canonicalRequest = [
+          method,
+          uri,
+          query,
+          sortedHeaders,
+          '',
+          signedHeaders,
+          hashedPayload
+        ].join('\n');
+
+        return { canonicalRequest, signedHeaders };
+      }
+
+      // 生成签名字符串
+      async createStringToSign(timestamp, canonicalRequest) {
+        const algorithm = 'HMAC-SHA256';
+        const shortDate = this.getShortDate(timestamp);
+        const credentialsScope = `${shortDate}/${this.region}/${this.service}/request`;
+        const hashedCanonicalRequest = await this.sha256(canonicalRequest);
+
+        return {
+          stringToSign: [algorithm, timestamp, credentialsScope, hashedCanonicalRequest].join('\n'),
+          credentialsScope
+        };
+      }
+
+      // 计算签名
+      async calculateSignature(stringToSign, timestamp) {
+        const shortDate = this.getShortDate(timestamp);
+
+        const kDate = await this.hmacSha256(`HMAC${this.secretAccessKey}`, shortDate);
+        const kRegion = await this.hmacSha256(kDate, this.region);
+        const kService = await this.hmacSha256(kRegion, this.service);
+        const kSigning = await this.hmacSha256(kService, 'request');
+        const signature = await this.hmacSha256(kSigning, stringToSign);
+
+        return this.toHex(signature);
+      }
+
+      // 生成授权头
+      async generateAuthHeader(method, uri, query, headers, payload, timestamp) {
+        const { canonicalRequest, signedHeaders } = await this.createCanonicalRequest(method, uri, query, headers, payload);
+        const { stringToSign, credentialsScope } = await this.createStringToSign(timestamp, canonicalRequest);
+        const signature = await this.calculateSignature(stringToSign, timestamp);
+
+        return `HMAC-SHA256 Credential=${this.accessKeyId}/${credentialsScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+      }
+
+      // 主要识别方法
+      async recognizeText(options = {}) {
+        try {
+          const {
+            imageBase64,
+            imageUrl,
+            approximate_pixel = "0",
+            mode = "default",
+            filter_thresh = "80",
+            half_to_full = "false"
+          } = options;
+
+          if (!imageBase64 && !imageUrl) {
+            throw new Error('必须提供 imageBase64 或 imageUrl 中的一个');
+          }
+
+          // 构建请求体参数
+          const bodyParams = {
+            Action: 'OCRNormal',
+            Version: '2020-08-26',
+            approximate_pixel: approximate_pixel,
+            mode: mode,
+            filter_thresh: filter_thresh,
+            half_to_full: half_to_full
+          };
+
+          if (imageBase64) {
+            bodyParams.image_base64 = imageBase64;
+          } else {
+            bodyParams.image_url = imageUrl;
+          }
+
+          const payload = new URLSearchParams(bodyParams).toString();
+          const timestamp = this.getTimestamp();
+
+          // 构建请求头
+          const headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Host': this.host,
+            'X-Date': timestamp
+          };
+
+          // 生成授权头
+          const authorization = await this.generateAuthHeader('POST', '/', '', headers, payload, timestamp);
+          headers.Authorization = authorization;
+
+          // 发送请求
+          const response = await fetch(this.endpoint, {
+            method: 'POST',
+            headers: headers,
+            body: payload
+          });
+
+          const result = await response.json();
+
+          if (result.code === 10000) {
+            return {
+              success: true,
+              data: result.data,
+              request_id: result.request_id,
+              code: result.code,
+              message: result.message
+            };
+          } else {
+            return {
+              success: false,
+              error: result.message || '识别失败',
+              code: result.code,
+              request_id: result.request_id,
+              httpStatus: response.status
+            };
+          }
+
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message || 'OCR调用失败',
+            httpStatus: error.status
+          };
+        }
+      }
+
+      // 从文件识别
+      async recognizeFromFile(file, options = {}) {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const base64Data = e.target.result.split(',')[1];
+              const result = await this.recognizeText({
+                ...options,
+                imageBase64: base64Data
+              });
+              resolve(result);
+            } catch (error) {
+              resolve({
+                success: false,
+                error: error.message || '文件读取失败'
+              });
+            }
+          };
+          reader.onerror = () => resolve({
+            success: false,
+            error: '文件读取失败'
+          });
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        // 状态管理
+        const config = ref({
+          accessKeyId: '',
+          secretAccessKey: ''
+        });
+
+        const activeTab = ref('file');
+        const selectedFile = ref(null);
+        const previewUrl = ref('');
+        const imageUrl = ref('');
+        const result = ref(null);
+        const isLoading = ref(false);
+        const isDragging = ref(false);
+        const recognitionTime = ref(0);
+        const debugInfo = ref('');
+
+        const apiOptions = ref({
+          mode: 'default',
+          filter_thresh: '80',
+          half_to_full: 'false'
+        });
+
+        const toast = ref({
+          show: false,
+          message: '',
+          type: 'success'
+        });
+
+        const tabs = ref([
+          { id: 'file', name: '文件上传', icon: 'fas fa-upload' },
+          { id: 'url', name: 'URL输入', icon: 'fas fa-link' }
+        ]);
+
+        // 计算属性
+        const canPerformOCR = computed(() => {
+          const hasCredentials = config.value.accessKeyId && config.value.secretAccessKey;
+          const hasInput = (activeTab.value === 'file' && selectedFile.value) ||
+            (activeTab.value === 'url' && imageUrl.value);
+          return hasCredentials && hasInput;
+        });
+
+        // 方法
+        const showToast = (message, type = 'success') => {
+          toast.value = { show: true, message, type };
+          setTimeout(() => {
+            toast.value.show = false;
+          }, 3000);
+        };
+
+        const handleFileSelect = (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            selectedFile.value = file;
+            previewUrl.value = URL.createObjectURL(file);
+          }
+        };
+
+        const handleDrop = (event) => {
+          event.preventDefault();
+          isDragging.value = false;
+
+          const files = event.dataTransfer.files;
+          if (files.length > 0 && files[0].type.startsWith('image/')) {
+            selectedFile.value = files[0];
+            previewUrl.value = URL.createObjectURL(files[0]);
+          }
+        };
+
+        const handleDragOver = (event) => {
+          event.preventDefault();
+        };
+
+        const handleDragEnter = (event) => {
+          event.preventDefault();
+          isDragging.value = true;
+        };
+
+        const handleDragLeave = (event) => {
+          event.preventDefault();
+          if (event.target === event.currentTarget) {
+            isDragging.value = false;
+          }
+        };
+
+        const handleImageError = () => {
+          showToast('图片加载失败，请检查URL是否正确', 'error');
+        };
+
+        const performOCR = async () => {
+          if (!canPerformOCR.value || isLoading.value) return;
+
+          isLoading.value = true;
+          result.value = null;
+          debugInfo.value = '';
+          const startTime = Date.now();
+
+          try {
+            debugInfo.value = `开始OCR识别...\n使用 Access Key: ${config.value.accessKeyId.substring(0, 8)}...\n`;
+
+            const ocrClient = new VOCRClient(
+              config.value.accessKeyId,
+              config.value.secretAccessKey
+            );
+
+            let ocrResult;
+            if (activeTab.value === 'file') {
+              debugInfo.value += `识别模式: 文件上传\n文件名: ${selectedFile.value.name}\n`;
+              ocrResult = await ocrClient.recognizeFromFile(selectedFile.value, apiOptions.value);
+            } else {
+              debugInfo.value += `识别模式: URL输入\nURL: ${imageUrl.value}\n`;
+              ocrResult = await ocrClient.recognizeText({
+                imageUrl: imageUrl.value,
+                ...apiOptions.value
+              });
+            }
+
+            recognitionTime.value = Date.now() - startTime;
+            result.value = ocrResult;
+
+            debugInfo.value += `识别完成，耗时: ${recognitionTime.value}ms\n`;
+            debugInfo.value += `结果: ${ocrResult.success ? '成功' : '失败'}\n`;
+
+            if (ocrResult.success) {
+              showToast(`识别成功！识别到 ${ocrResult.data.line_texts.length} 行文本`, 'success');
+            } else {
+              debugInfo.value += `错误信息: ${ocrResult.error}\n`;
+              showToast(`识别失败：${ocrResult.error}`, 'error');
+            }
+
+          } catch (error) {
+            recognitionTime.value = Date.now() - startTime;
+            debugInfo.value += `发生异常: ${error.message}\n`;
+            result.value = {
+              success: false,
+              error: error.message
+            };
+            showToast(`调用失败：${error.message}`, 'error');
+          } finally {
+            isLoading.value = false;
+          }
+        };
+
+        const copyText = async () => {
+          if (!result.value?.success) return;
+
+          const text = result.value.data.line_texts.join('\n');
+          try {
+            await navigator.clipboard.writeText(text);
+            showToast('文本已复制到剪贴板', 'success');
+          } catch (error) {
+            showToast('复制失败', 'error');
+          }
+        };
+
+        // 生命周期
+        onMounted(() => {
+          const savedConfig = localStorage.getItem('ocrConfig');
+          if (savedConfig) {
+            try {
+              Object.assign(config.value, JSON.parse(savedConfig));
+            } catch (e) {
+              console.warn('Failed to load saved config');
+            }
+          }
+
+          const saveConfig = () => {
+            localStorage.setItem('ocrConfig', JSON.stringify(config.value));
+          };
+
+          document.addEventListener('input', (e) => {
+            if (e.target.matches('input[type="text"], input[type="password"]')) {
+              setTimeout(saveConfig, 500);
+            }
+          });
+        });
+
+        return {
+          config,
+          activeTab,
+          selectedFile,
+          previewUrl,
+          imageUrl,
+          result,
+          isLoading,
+          isDragging,
+          recognitionTime,
+          apiOptions,
+          toast,
+          tabs,
+          debugInfo,
+          canPerformOCR,
+          handleFileSelect,
+          handleDrop,
+          handleDragOver,
+          handleDragEnter,
+          handleDragLeave,
+          handleImageError,
+          performOCR,
+          copyText
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+
+</html>
