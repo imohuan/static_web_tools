@@ -32,6 +32,22 @@
       border-radius: 3px;
     }
 
+    /* 自定义滚动条类 */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 4px;
+    }
+
     /* 渐变背景 */
     .gradient-bg {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -372,80 +388,88 @@
     <!-- 主要内容区域 -->
     <div class="flex-1 w-full h-full overflow-hidden">
       <!-- 科目管理页面 -->
-      <div v-show="currentTab === 'subjects'" class="h-full bg-gradient-to-br from-purple-50 to-blue-50">
-        <!-- 头部 -->
-        <div class="gradient-bg px-6 pt-8 pb-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <h1 class="text-2xl font-bold text-white mb-1">学科中心</h1>
-              <p class="text-purple-100 text-sm">管理您的学习科目</p>
-            </div>
-            <div class="bg-white/20 rounded-full p-3">
-              <i data-lucide="book-open" class="w-6 h-6 text-white"></i>
-            </div>
-          </div>
-        </div>
-
-        <!-- 科目统计卡片 -->
-        <div class="px-6 -mt-6 mb-6">
-          <div class="glass-effect rounded-2xl p-4">
-            <div class="grid grid-cols-3 gap-4">
-              <div class="text-center">
-                <div class="text-2xl font-bold text-gray-800">{{ subjects.length }}</div>
-                <div class="text-xs text-gray-600">科目总数</div>
+      <div v-show="currentTab === 'subjects'"
+        class="h-full flex flex-col bg-gradient-to-br from-purple-50 to-blue-50 overflow-hidden">
+        <!-- 可滚动内容区域 -->
+        <div class="flex-1 overflow-y-auto custom-scrollbar">
+          <!-- 标题部分（可滚动） -->
+          <div class="gradient-bg px-6 pt-8 pb-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h1 class="text-2xl font-bold text-white mb-1">学科中心</h1>
+                <p class="text-purple-100 text-sm">管理您的学习科目</p>
               </div>
-              <div class="text-center border-l border-r border-white/30">
-                <div class="text-2xl font-bold text-gray-800">{{ questions.length }}</div>
-                <div class="text-xs text-gray-600">题目总数</div>
-              </div>
-              <div class="text-center">
-                <div class="text-2xl font-bold text-gray-800">{{ todayQuestions }}</div>
-                <div class="text-xs text-gray-600">今日新增</div>
+              <div class="bg-white/20 rounded-full p-3">
+                <i data-lucide="book-open" class="w-6 h-6 text-white"></i>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- 科目列表或空状态 -->
-        <div class="px-6">
-          <div v-if="subjects.length > 0" class="space-y-4">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-lg font-semibold text-gray-800">我的科目</h2>
-              <div class="flex space-x-2">
-                <button @click="exportData"
-                  class="bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-600 transition-all">
-                  <i data-lucide="download" class="w-4 h-4 inline --mr-1"></i>
-                  <!-- 导出数据 -->
-                </button>
-                <button @click="showImportModal = true"
-                  class="bg-green-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-600 transition-all">
-                  <i data-lucide="upload" class="w-4 h-4 inline --mr-1"></i>
-                  <!-- 导入数据 -->
-                </button>
-                <button @click="showAddSubjectModal = true"
-                  class="btn-primary text-white px-4 py-2 rounded-xl text-sm font-medium hover-glow">
-                  <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
-                  添加科目
-                </button>
+          <!-- 科目统计卡片 -->
+          <div class="px-6 -mt-6 mb-6">
+            <div class="glass-effect rounded-2xl p-4">
+              <div class="grid grid-cols-3 gap-4">
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-gray-800">{{ subjects.length }}</div>
+                  <div class="text-xs text-gray-600">科目总数</div>
+                </div>
+                <div class="text-center border-l border-r border-white/30">
+                  <div class="text-2xl font-bold text-gray-800">{{ questions.length }}</div>
+                  <div class="text-xs text-gray-600">题目总数</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-2xl font-bold text-gray-800">{{ todayQuestions }}</div>
+                  <div class="text-xs text-gray-600">今日新增</div>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div class="space-y-3">
+          <!-- 固定在顶部的操作区域 -->
+          <div
+            class="sticky top-0 z-10 bg-gradient-to-br from-purple-50/95 to-blue-50/95 backdrop-blur-sm border-b border-blue-100/50 shadow-sm">
+            <div class="px-6 py-4">
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-800">我的科目</h2>
+                <div class="flex flex-wrap gap-2 justify-end">
+                  <button @click="exportData"
+                    class="bg-blue-500 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-blue-600 transition-all flex items-center">
+                    <i data-lucide="download" class="w-4 h-4 mr-1"></i>
+                    导出
+                  </button>
+                  <button @click="showImportModal = true"
+                    class="bg-green-500 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-green-600 transition-all flex items-center">
+                    <i data-lucide="upload" class="w-4 h-4 mr-1"></i>
+                    导入
+                  </button>
+                  <button @click="showAddSubjectModal = true"
+                    class="btn-primary text-white px-3 py-2 rounded-xl text-sm font-medium hover-glow flex items-center">
+                    <i data-lucide="plus" class="w-4 h-4 mr-1"></i>
+                    添加
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 科目列表或空状态 -->
+          <div class="px-6 pb-20 pt-4">
+            <div v-if="subjects.length > 0" class="space-y-3">
               <div v-for="subject in subjects" :key="subject"
                 class="bg-white rounded-2xl shadow-sm hover-rise transition-all duration-300 cursor-pointer"
                 @click="selectSubject(subject)">
                 <div class="p-5">
                   <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-4">
-                      <div class="gradient-bg w-12 h-12 rounded-xl flex items-center justify-center">
+                    <div class="flex items-center space-x-4 min-w-0">
+                      <div class="gradient-bg w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0">
                         <i data-lucide="book" class="w-6 h-6 text-white"></i>
                       </div>
-                      <div>
-                        <h3 class="font-semibold text-gray-800">{{ subject }}</h3>
+                      <div class="min-w-0">
+                        <h3 class="font-semibold text-gray-800 truncate">{{ subject }}</h3>
                         <p class="text-sm text-gray-500">{{ getSubjectQuestionCount(subject) }} 道题目</p>
                       </div>
                     </div>
-                    <div class="flex items-center space-x-2">
+                    <div class="flex items-center space-x-2 flex-shrink-0">
                       <button @click.stop="confirmDeleteSubject(subject)"
                         class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -460,26 +484,26 @@
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- 空状态 -->
-          <div v-else class="text-center py-16">
-            <div class="gradient-bg w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <i data-lucide="book-open" class="w-10 h-10 text-white"></i>
-            </div>
-            <h3 class="text-xl font-semibold text-gray-800 mb-2">开始您的学习之旅</h3>
-            <p class="text-gray-500 mb-8 max-w-sm mx-auto">添加您的第一个学科，开始构建专属题库</p>
-            <div class="flex flex-wrap justify-center gap-4">
-              <button @click="showAddSubjectModal = true"
-                class="btn-primary text-white px-8 py-4 rounded-2xl text-lg font-medium hover-glow bounce-in">
-                <i data-lucide="plus" class="w-5 h-5 inline mr-2"></i>
-                创建科目
-              </button>
-              <button @click="showImportModal = true"
-                class="bg-green-500 text-white px-8 py-4 rounded-2xl text-lg font-medium hover:bg-green-600 transition-all bounce-in">
-                <i data-lucide="upload" class="w-5 h-5 inline mr-2"></i>
-                导入数据
-              </button>
+            <!-- 空状态 -->
+            <div v-else class="text-center py-16">
+              <div class="gradient-bg w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="book-open" class="w-10 h-10 text-white"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-gray-800 mb-2">开始您的学习之旅</h3>
+              <p class="text-gray-500 mb-8 max-w-sm mx-auto">添加您的第一个学科，开始构建专属题库</p>
+              <div class="flex flex-wrap justify-center gap-4">
+                <button @click="showAddSubjectModal = true"
+                  class="btn-primary text-white px-8 py-4 rounded-2xl text-lg font-medium hover-glow bounce-in">
+                  <i data-lucide="plus" class="w-5 h-5 inline mr-2"></i>
+                  创建科目
+                </button>
+                <button @click="showImportModal = true"
+                  class="bg-green-500 text-white px-8 py-4 rounded-2xl text-lg font-medium hover:bg-green-600 transition-all bounce-in">
+                  <i data-lucide="upload" class="w-5 h-5 inline mr-2"></i>
+                  导入数据
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -729,23 +753,32 @@
           </div>
 
           <!-- 提交按钮 -->
-          <button @click="processUpload"
-            :disabled="(!uploadedImage && !textInput) || !selectedSubjectForUpload || isProcessing"
-            class="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white py-4 rounded-2xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover-glow transition-all">
-            <div v-if="isProcessing" class="flex items-center justify-center">
-              <svg class="animate-spin w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                </path>
-              </svg>
-              AI 正在分析处理中...
-            </div>
-            <div v-else class="flex items-center justify-center">
-              <i data-lucide="zap" class="w-5 h-5 mr-2"></i>
-              开始 AI 识别
-            </div>
-          </button>
+          <div class="flex space-x-3 mt-6">
+            <button @click="processLocalText" :disabled="!textInput || !selectedSubjectForUpload"
+              class="flex-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white py-4 rounded-2xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover-glow transition-all">
+              <div class="flex items-center justify-center">
+                <i data-lucide="code" class="w-5 h-5 mr-2"></i>
+                本地解析
+              </div>
+            </button>
+            <button @click="processUpload"
+              :disabled="(!uploadedImage && !textInput) || !selectedSubjectForUpload || isProcessing"
+              class="flex-1 bg-gradient-to-r from-green-500 to-teal-500 text-white py-4 rounded-2xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover-glow transition-all">
+              <div v-if="isProcessing" class="flex items-center justify-center">
+                <svg class="animate-spin w-5 h-5 mr-3" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                  </path>
+                </svg>
+                AI 正在分析处理中...
+              </div>
+              <div v-else class="flex items-center justify-center">
+                <i data-lucide="zap" class="w-5 h-5 mr-2"></i>
+                开始 AI 识别
+              </div>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1393,9 +1426,149 @@
   </div>
 
   <script>
+    // 不允许修改
+    class ParseTextTools {
+      /**
+       * 将中文标点符号转换为英文标点符号
+       * @param {string} text - 包含中文标点的文本
+       * @return {string} 转换后的文本
+       */
+      convertChineseSymbols(text) {
+        return text
+          .replace(/，/g, ",") // 逗号
+          .replace(/。/g, ".") // 句号
+          .replace(/？/g, "?") // 问号
+          .replace(/！/g, "!") // 感叹号
+          .replace(/；/g, ";") // 分号
+          .replace(/：/g, ":") // 冒号
+          .replace(/"/g, '"') // 左双引号
+          .replace(/"/g, '"') // 右双引号
+          .replace(/'/g, "'") // 左单引号
+          .replace(/'/g, "'") // 右单引号
+          .replace(/（/g, "(") // 左括号
+          .replace(/）/g, ")") // 右括号
+          .replace(/【/g, "[") // 左方括号
+          .replace(/】/g, "]") // 右方括号
+          .replace(/—/g, "-") // 破折号
+          .replace(/…/g, "...") // 省略号
+          .replace(/\s+/g, " "); // 空格
+      }
+
+      /**
+       * 判断题目类型
+       * @param {string} title - 题目标题
+       * @param {string} answer - 题目答案
+       * @return {string} 题目类型
+       */
+      determineQuestionType(title, answer) {
+        // 判断题
+        if (
+          title.includes("判断") ||
+          answer.trim() === "对" ||
+          answer.trim() === "错" ||
+          answer.trim() === "正确" ||
+          answer.trim() === "错误" ||
+          answer.trim() === "T" ||
+          answer.trim() === "F"
+        ) {
+          return "判断题";
+        }
+
+        if (answer.indexOf("(1)") !== -1 || /\(\d+\)/.test(answer)) {
+          return "论述题";
+        }
+
+        // 多选题 - 多个选项，通常用逗号或空格分隔
+        if (
+          /[A-D][,，\s]+[A-D]/.test(answer) ||
+          (answer.match(/[A-D]/g) || []).length >= 2 ||
+          answer.split(/\s|,/).length >= 2
+        ) {
+          return "多选题";
+        }
+
+        return "单选题";
+      }
+
+
+      /**
+       * 提取学科名称
+       * @param {string} title - 题目标题
+       * @return {string} 学科名称
+       */
+      extractSubjectName(title) {
+        // 基于题目关键词判断学科
+        const subjects = {
+          '心理学': ['心理', '认知', '行为'],
+          '管理学': ['管理', '团体', '组织', '领导'],
+          '计算机': ['编程', '算法', '数据结构'],
+          '数学': ['数学', '代数', '几何']
+        };
+
+        for (const [subject, keywords] of Object.entries(subjects)) {
+          for (const keyword of keywords) {
+            if (title.includes(keyword)) {
+              return subject;
+            }
+          }
+        }
+        return '未分类';
+      }
+
+
+      /**
+       * 解析题目文本
+       * @param {string} text - 输入的题目文本
+       * @return {Array} 解析后的结构化数据
+       */
+      parseQuestions(text, subjects_name = "") {
+        const results = [];
+        // 将顿号左右空格去除
+        text = text.replace(/\s*、\s*/g, "、")
+        const convertedText = this.convertChineseSymbols(text);
+        // const r = /\d+、[^]*?(?=(?:^|[^\d])\d+、|$)/g
+        const r = /\d+、[^]*?(?=\d+、|$)/g;
+
+        // 分割每道题目
+        const textSplits = Array.from(convertedText.match(r) || [])
+          .map((f) => f.trim())
+          .filter(Boolean);
+
+        textSplits.forEach((f) => {
+          // 匹配题号、题目和答案
+          const r = f.match(/(\d+)、([^(:]+)(?:[:]?\s*)?(.+)/s);
+
+          if (r) {
+            const [_, n, rawTitle, rawAnswer] = r;
+            const title = rawTitle.trim();
+            let answer = rawAnswer.trim();
+
+            // 如果开头结尾都是括号，则去掉
+            if (answer.startsWith("(") && answer.endsWith(")")) {
+              answer = answer.slice(1, -1);
+            }
+            // 判断题目类型
+            const classification = this.determineQuestionType(title, answer);
+            // 构建结果对象
+            results.push({
+              subjects_name: subjects_name || this.extractSubjectName(title),
+              classification,
+              title,
+              answer,
+            });
+          } else {
+            console.log("解析错误", f);
+          }
+        });
+        return results;
+      }
+    }
+    const ptTool = new ParseTextTools()
+  </script>
+
+  <script>
     // 初始化 Lucide 图标
     lucide.createIcons();
-
     const token = "pat_xFzog6n08JTkmagiXDJenxqBm7fH7euZlh9Gct8icgQL6TfbZWCC1Mo5thfqdBhr";
 
     /**
@@ -1733,6 +1906,14 @@
 
           isProcessing.value = true;
 
+          // 处理科目名称：如果科目已存在，添加随机后缀；如果不存在，直接使用
+          let subjects_name = selectedSubjectForUpload.value;
+          if (subjects.value.includes(subjects_name)) {
+            // 如果科目已存在，添加随机后缀
+            const randomNumber = Math.floor(Math.random() * 10000);
+            subjects_name = `${subjects_name}(AI识别 ${randomNumber})`;
+          }
+
           // 定义使用备用数据的函数
           const useBackupData = (subjects_name) => {
             const backupQuestions = [
@@ -1768,6 +1949,13 @@
 
             // 添加到题目列表
             questions.value.push(...uniqueQuestions);
+
+            // 如果科目不在列表中，添加到科目列表
+            if (!subjects.value.includes(subjects_name)) {
+              subjects.value.push(subjects_name);
+            }
+
+            // 保存到本地存储
             saveToLocalStorage();
 
             // 清空输入
@@ -1785,6 +1973,9 @@
 
             // 重置处理状态
             isProcessing.value = false;
+
+            // 重新初始化图标
+            setTimeout(() => lucide.createIcons(), 100);
           };
 
           // 处理API返回的数据
@@ -1827,8 +2018,13 @@
 
                 // 添加到题目列表
                 questions.value.push(...uniqueQuestions);
-                saveToLocalStorage();
-                subjects.value.push(subjects_name);
+
+                // 如果科目不在列表中，添加到科目列表
+                if (!subjects.value.includes(subjects_name)) {
+                  subjects.value.push(subjects_name);
+                }
+
+                // 保存到本地存储
                 saveToLocalStorage();
 
                 // 清空输入
@@ -1846,6 +2042,9 @@
 
                 // 重置处理状态
                 isProcessing.value = false;
+
+                // 重新初始化图标
+                setTimeout(() => lucide.createIcons(), 100);
               } else {
                 // 如果output不是数组或不存在，也打开debug_url
                 if (result.debug_url) {
@@ -1896,10 +2095,6 @@
             // 调用Coze工作流API
             const result = await callCozeWorkflow(token, parameters);
             console.log("API响应:", result);
-
-            // 生成随机数字作为科目后缀
-            const randomNumber = Math.floor(Math.random() * 10000);
-            const subjects_name = selectedSubjectForUpload.value + `(暂存 ${randomNumber})`;
 
             // 处理API返回的数据
             processApiData(result.data, subjects_name);
@@ -2487,24 +2682,57 @@
               return;
             }
 
-            // 确认是否覆盖现有数据
-            const confirmMessage = subjects.value.length > 0 ?
-              `确定要导入数据吗？这将覆盖现有的${subjects.value.length}个科目和${questions.value.length}道题目。` :
-              `确定要导入${data.subjects.length}个科目和${data.questions.length}道题目吗？`;
+            // 修改确认消息
+            const confirmMessage = `确定要导入${data.subjects.length}个科目和${data.questions.length}道题目吗？导入时将保留现有题目，新题目将被添加到列表中。`;
 
             notify.confirm(
               confirmMessage,
               () => {
-                // 用户确认，执行导入
-                subjects.value = data.subjects;
-                questions.value = data.questions;
+                // 用户确认，执行导入但不覆盖
 
-                // 确保所有题目都有answers数组
-                questions.value.forEach(q => {
-                  if (!q.answers) {
-                    q.answers = [];
+                // 处理科目
+                const newSubjects = [];
+                const renamedSubjectsMap = new Map(); // 用于跟踪重命名的科目
+
+                data.subjects.forEach(subject => {
+                  if (!subjects.value.includes(subject)) {
+                    // 如果科目不存在，直接添加
+                    newSubjects.push(subject);
+                  } else {
+                    // 如果科目已存在，添加随机后缀
+                    const randomNumber = Math.floor(Math.random() * 10000);
+                    const newSubjectName = `${subject}(导入 ${randomNumber})`;
+                    newSubjects.push(newSubjectName);
+                    // 记录原科目名称到新科目名称的映射
+                    renamedSubjectsMap.set(subject, newSubjectName);
                   }
                 });
+
+                // 添加新科目
+                subjects.value = [...subjects.value, ...newSubjects];
+
+                // 处理题目
+                const newQuestions = [];
+                data.questions.forEach(question => {
+                  // 创建题目的副本
+                  const questionCopy = { ...question };
+
+                  // 检查科目是否被重命名
+                  if (renamedSubjectsMap.has(question.subjects_name)) {
+                    // 如果科目被重命名，更新题目的科目名称
+                    questionCopy.subjects_name = renamedSubjectsMap.get(question.subjects_name);
+                  }
+
+                  // 确保题目有answers数组
+                  if (!questionCopy.answers) {
+                    questionCopy.answers = [];
+                  }
+
+                  newQuestions.push(questionCopy);
+                });
+
+                // 添加新题目到现有列表
+                questions.value = [...questions.value, ...newQuestions];
 
                 // 保存到本地存储
                 saveToLocalStorage();
@@ -2517,7 +2745,10 @@
                   importFileInput.value.value = '';
                 }
 
-                notify.success(`成功导入${subjects.value.length}个科目和${questions.value.length}道题目`);
+                notify.success(`成功导入${newSubjects.length}个科目和${newQuestions.length}道题目`);
+
+                // 重新初始化图标
+                setTimeout(() => lucide.createIcons(), 100);
               },
               () => {
                 // 用户取消，不执行任何操作
@@ -2645,6 +2876,152 @@
           }
         };
 
+        // 本地解析文本
+        const processLocalText = () => {
+          if (!textInput.value || !selectedSubjectForUpload.value) {
+            return;
+          }
+
+          try {
+            // 调用parserText函数解析文本
+            const parsedQuestions = parserText(textInput.value);
+
+            // 处理科目名称：如果科目已存在，添加随机后缀；如果不存在，直接使用
+            let subjects_name = selectedSubjectForUpload.value;
+            if (subjects.value.includes(subjects_name)) {
+              // 如果科目已存在，添加随机后缀
+              const randomNumber = Math.floor(Math.random() * 10000);
+              subjects_name = `${subjects_name}(本地解析 ${randomNumber})`;
+            }
+
+            // 处理解析结果
+            if (parsedQuestions && Array.isArray(parsedQuestions) && parsedQuestions.length > 0) {
+              // 为每个解析出的题目添加科目名称
+              const processedQuestions = parsedQuestions.map(q => ({
+                ...q,
+                subjects_name: subjects_name,
+                answers: [] // 初始化空的 answers 数组
+              }));
+
+              // 题目去重处理
+              const existingTitles = new Set(questions.value.map(q => q.title.trim()));
+              const uniqueQuestions = processedQuestions.filter(q => !existingTitles.has(q.title.trim()));
+
+              // 如果有重复题目，显示提示
+              const duplicateCount = processedQuestions.length - uniqueQuestions.length;
+              if (duplicateCount > 0) {
+                notify.warning(`已过滤 ${duplicateCount} 道重复题目`);
+              }
+
+              // 添加到题目列表
+              questions.value.push(...uniqueQuestions);
+
+              // 如果科目不在列表中，添加到科目列表
+              if (!subjects.value.includes(subjects_name)) {
+                subjects.value.push(subjects_name);
+              }
+
+              // 保存到本地存储
+              saveToLocalStorage();
+
+              // 清空输入
+              textInput.value = '';
+              selectedSubjectForUpload.value = '';
+
+              // 跳转到题目页面
+              currentTab.value = 'questions';
+              // 设置筛选器为当前上传的科目
+              selectedSubjectFilter.value = subjects_name;
+
+              // 显示成功提示
+              notify.success(`已成功解析并添加 ${uniqueQuestions.length} 道题目`);
+
+              // 重新初始化图标
+              setTimeout(() => lucide.createIcons(), 100);
+            } else {
+              notify.error('未能解析出题目数据，请检查输入内容');
+            }
+          } catch (error) {
+            console.error('本地解析失败:', error);
+            notify.error('本地解析失败: ' + error.message);
+          }
+        };
+
+        // parserText函数，可由用户自行实现或使用默认实现
+        const parserText = (text) => {
+          // 检查是否存在用户自定义的解析工具
+          if (typeof ptTool !== 'undefined' && ptTool.parseQuestions) {
+            return ptTool.parseQuestions(text, selectedSubjectForUpload.value);
+          }
+
+          // 如果没有找到用户自定义的解析工具，显示警告并使用默认实现
+          console.warn("未找到自定义的parseQuestions方法，将使用默认实现。您可以通过实现ParseTextTools类并替换ptTool实例来自定义解析逻辑。");
+
+          /**
+           * 默认解析函数实现
+           * 
+           * 此函数接收文本输入，并返回符合以下格式的数组：
+           * [
+           *   {
+           *     classification: '题目类型，如"选择题"、"填空题"等',
+           *     title: '题目内容',
+           *     answer: '答案内容'
+           *   },
+           *   ...
+           * ]
+           */
+
+          try {
+            // 示例实现：将文本按空行分割为题目和答案对
+            const pairs = text.split(/\n\s*\n/);
+            const result = [];
+
+            for (let i = 0; i < pairs.length; i++) {
+              const pair = pairs[i].trim();
+              if (!pair) continue;
+
+              // 尝试找出题目和答案的分界线
+              // 这里简单假设"答案："或"解析："标记答案的开始
+              const answerIndex = pair.search(/(?:答案[：:：]|解析[：:：])/i);
+
+              if (answerIndex > 0) {
+                const title = pair.substring(0, answerIndex).trim();
+                const answer = pair.substring(answerIndex).trim();
+
+                // 推断题目类型
+                let classification = '其他';
+                if (title.includes('选择题') || /[A-D][.．。)]/.test(title)) {
+                  classification = '选择题';
+                } else if (title.includes('填空题') || title.includes('____')) {
+                  classification = '填空题';
+                } else if (title.includes('计算题') || title.includes('计算')) {
+                  classification = '计算题';
+                } else if (title.includes('问答题') || title.includes('简答题')) {
+                  classification = '问答题';
+                }
+
+                result.push({
+                  classification,
+                  title,
+                  answer
+                });
+              } else {
+                // 如果没找到明确的分界线，假设这是一个没有答案的题目
+                result.push({
+                  classification: '其他',
+                  title: pair,
+                  answer: '暂无答案'
+                });
+              }
+            }
+
+            return result;
+          } catch (e) {
+            console.error('解析文本失败:', e);
+            throw new Error('解析文本失败: ' + e.message);
+          }
+        };
+
         return {
           currentTab,
           subjects,
@@ -2729,7 +3106,8 @@
           selectedFileName,
           handleFileImport,
           triggerFileInput,
-          handlePaste
+          handlePaste,
+          processLocalText
         };
       }
     };
