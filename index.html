@@ -97,7 +97,7 @@
 
     /* 页面卡片 */
     .page-card {
-      height: 280px;
+      height: 200px;
       overflow: hidden;
       position: relative;
     }
@@ -107,13 +107,30 @@
       bottom: 0;
       left: 0;
       right: 0;
-      height: 100px;
+      height: 80px;
       background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.9) 50%, white);
     }
 
     .page-card-content {
-      max-height: 220px;
+      max-height: 160px;
       overflow: hidden;
+    }
+
+    /* 标签样式 */
+    .tag {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      background-color: rgba(102, 126, 234, 0.1);
+      color: #667eea;
+      margin-right: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    [v-cloak] {
+      display: none;
     }
   </style>
 </head>
@@ -153,14 +170,42 @@
         </div>
       </div>
 
+      <!-- 搜索和筛选 -->
+      <div v-if="!loading && !error" class="mb-8">
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <!-- 搜索框 -->
+            <div class="relative flex-grow max-w-md">
+              <input v-model="searchQuery" type="text" placeholder="搜索页面..."
+                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none">
+              <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            </div>
+
+            <!-- 标签筛选 -->
+            <div class="flex flex-wrap gap-2">
+              <button @click="selectedTag = ''"
+                :class="['px-3 py-1 rounded-full text-sm font-medium transition-colors', 
+                              !selectedTag ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300']">
+                全部
+              </button>
+              <button v-for="tag in allTags" :key="tag" @click="selectedTag = tag"
+                :class="['px-3 py-1 rounded-full text-sm font-medium transition-colors', 
+                              selectedTag === tag ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300']">
+                {{ tag }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 页面卡片网格 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <div v-for="(page, index) in pages" :key="index"
+      <div v-if="!loading && !error" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div v-for="(page, index) in filteredPages" :key="index"
           class="bg-white rounded-xl shadow-lg overflow-hidden hover-rise">
           <div class="p-6">
             <div class="flex items-center justify-between mb-4">
               <h2 class="text-xl font-bold text-gray-800 flex items-center">
-                <i :class="getIconForPage(page.filename)" class="mr-2 text-indigo-600"></i>
+                <i :class="page.icon" class="mr-2 text-indigo-600"></i>
                 {{ page.title }}
               </h2>
               <a :href="page.filename" class="text-indigo-600 hover:text-indigo-800">
@@ -173,6 +218,12 @@
               </div>
               <div class="page-card-overlay"></div>
             </div>
+            <!-- 标签 -->
+            <div class="mt-4">
+              <span v-for="tag in page.tags" :key="tag" class="tag">
+                {{ tag }}
+              </span>
+            </div>
           </div>
           <div class="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
             <span class="text-xs text-gray-500">
@@ -184,6 +235,14 @@
               访问页面
             </a>
           </div>
+        </div>
+      </div>
+
+      <!-- 无结果提示 -->
+      <div v-if="!loading && !error && filteredPages.length === 0" class="text-center py-16">
+        <div class="text-white text-xl">
+          <i class="fas fa-search mb-4 text-4xl opacity-50"></i>
+          <p>没有找到匹配的页面</p>
         </div>
       </div>
     </main>
@@ -203,86 +262,61 @@
         return {
           pages: [],
           loading: true,
-          error: null
+          error: null,
+          searchQuery: '',
+          selectedTag: ''
         };
+      },
+      computed: {
+        // 获取所有标签
+        allTags() {
+          const tagSet = new Set();
+          this.pages.forEach(page => {
+            if (page.tags && Array.isArray(page.tags)) {
+              page.tags.forEach(tag => tagSet.add(tag));
+            }
+          });
+          return Array.from(tagSet);
+        },
+        // 过滤后的页面
+        filteredPages() {
+          return this.pages.filter(page => {
+            // 标签筛选
+            if (this.selectedTag && (!page.tags || !page.tags.includes(this.selectedTag))) {
+              return false;
+            }
+
+            // 搜索筛选
+            if (this.searchQuery) {
+              const query = this.searchQuery.toLowerCase();
+              return page.title.toLowerCase().includes(query) ||
+                page.description.toLowerCase().includes(query) ||
+                (page.tags && page.tags.some(tag => tag.toLowerCase().includes(query)));
+            }
+
+            return true;
+          });
+        }
       },
       mounted() {
         this.fetchPages();
       },
       methods: {
-        // 获取所有HTML页面
+        // 从JSON文件获取页面数据
         async fetchPages() {
           try {
-            // 获取当前目录下的所有文件
-            const response = await fetch('.');
-            const html = await response.text();
+            const response = await fetch('pages.json');
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
-            // 解析HTML以获取文件列表
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const links = Array.from(doc.querySelectorAll('a'));
-
-            // 过滤出HTML文件（排除index.html自身）
-            const htmlFiles = links
-              .map(link => link.getAttribute('href'))
-              .filter(href => href && href.endsWith('.html') && href !== 'index.html');
-
-            // 获取每个页面的内容
-            const pagePromises = htmlFiles.map(filename => this.fetchPageInfo(filename));
-            this.pages = await Promise.all(pagePromises);
-
+            this.pages = await response.json();
             this.loading = false;
           } catch (err) {
             console.error('Error fetching pages:', err);
             this.error = '获取页面列表失败，请刷新页面重试。';
             this.loading = false;
           }
-        },
-
-        // 获取单个页面的信息
-        async fetchPageInfo(filename) {
-          try {
-            const response = await fetch(filename);
-            const html = await response.text();
-
-            // 解析HTML
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-
-            // 获取标题
-            const title = doc.querySelector('title')?.textContent || filename;
-
-            // 获取描述（从内容中提取）
-            const bodyText = doc.body.textContent.replace(/\s+/g, ' ').trim();
-            const description = bodyText.substring(0, 500) + '...';
-
-            return {
-              filename,
-              title,
-              description,
-              size: response.headers.get('content-length') || 0
-            };
-          } catch (err) {
-            console.error(`Error fetching ${filename}:`, err);
-            return {
-              filename,
-              title: filename,
-              description: '无法加载页面内容',
-              size: 0
-            };
-          }
-        },
-
-        // 根据文件名获取图标
-        getIconForPage(filename) {
-          const iconMap = {
-            'text_topic.html': 'fas fa-book',
-            'ai-model.html': 'fas fa-robot',
-            'ocr.html': 'fas fa-eye',
-            'upload.html': 'fas fa-cloud-upload-alt'
-          };
-
-          return iconMap[filename] || 'fas fa-file';
         },
 
         // 格式化文件大小
