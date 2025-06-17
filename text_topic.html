@@ -2099,7 +2099,7 @@
           };
 
           // 处理API返回的数据
-          const processApiData = (data, subjects_name) => {
+          const processApiData = (data, subjects_name, apiResult) => {
             try {
               const data_json = JSON.parse(data);
               console.log(data, data_json);
@@ -2107,8 +2107,8 @@
               if (output && Array.isArray(output)) {
                 if (output.length === 0) {
                   // 如果没有解析出数据，打开debug_url
-                  if (result.debug_url) {
-                    window.open(result.debug_url, '_blank');
+                  if (apiResult && apiResult.debug_url) {
+                    window.open(apiResult.debug_url, '_blank');
                     notify.warning('未能解析出题目数据，已打开调试页面');
                   } else {
                     notify.error('未能解析出题目数据，且没有调试链接');
@@ -2167,8 +2167,8 @@
                 setTimeout(() => lucide.createIcons(), 100);
               } else {
                 // 如果output不是数组或不存在，也打开debug_url
-                if (result.debug_url) {
-                  window.open(result.debug_url, '_blank');
+                if (apiResult && apiResult.debug_url) {
+                  window.open(apiResult.debug_url, '_blank');
                   notify.warning('返回数据格式不正确，已打开调试页面');
                 } else {
                   notify.error('返回数据格式不正确，且没有调试链接');
@@ -2179,8 +2179,8 @@
               console.error('解析API响应失败:', error);
 
               // 解析失败，处理debug_url
-              if (result.debug_url) {
-                window.open(result.debug_url, '_blank');
+              if (apiResult && apiResult.debug_url) {
+                window.open(apiResult.debug_url, '_blank');
                 notify.warning('解析API响应失败，已打开调试页面');
 
                 // 询问用户是否要使用备用数据
@@ -2217,7 +2217,7 @@
             console.log("API响应:", result);
 
             // 处理API返回的数据
-            processApiData(result.data, subjects_name);
+            processApiData(result.data, subjects_name, result);
           } catch (error) {
             console.error('处理失败:', error);
             notify.error('处理失败，请稍后重试');
