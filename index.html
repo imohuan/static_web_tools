@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>答案之书 - 导航中心</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* 自定义滚动条 */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 3px;
+    }
+
+    /* 渐变背景 */
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .card-gradient {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+      backdrop-filter: blur(10px);
+    }
+
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    /* 自定义动画 */
+    .bounce-in {
+      animation: bounceIn 0.6s ease-out;
+    }
+
+    @keyframes bounceIn {
+      0% {
+        transform: scale(0.3);
+        opacity: 0;
+      }
+
+      50% {
+        transform: scale(1.05);
+      }
+
+      70% {
+        transform: scale(0.9);
+      }
+
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .slide-up {
+      animation: slideUp 0.4s ease-out;
+    }
+
+    @keyframes slideUp {
+      0% {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+
+      100% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    /* 悬停效果 */
+    .hover-rise {
+      transition: all 0.3s ease;
+    }
+
+    .hover-rise:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .hover-glow:hover {
+      box-shadow: 0 0 20px rgba(102, 126, 234, 0.5);
+    }
+
+    /* 页面卡片 */
+    .page-card {
+      height: 280px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .page-card-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100px;
+      background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.9) 50%, white);
+    }
+
+    .page-card-content {
+      max-height: 220px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen gradient-bg">
+  <div id="app" v-cloak>
+    <!-- 头部 -->
+    <header class="py-12 px-4 text-center">
+      <div class="max-w-5xl mx-auto">
+        <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">
+          <i class="fas fa-book-open mr-3"></i>答案之书
+        </h1>
+        <p class="text-xl text-indigo-100 max-w-3xl mx-auto">
+          欢迎访问答案之书导航中心，这里收集了各种实用工具和资源
+        </p>
+      </div>
+    </header>
+
+    <!-- 主要内容 -->
+    <main class="max-w-6xl mx-auto px-4 pb-16">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="flex flex-col items-center justify-center py-20">
+        <div class="w-16 h-16 border-4 border-indigo-200 border-t-indigo-500 rounded-full animate-spin"></div>
+        <p class="mt-4 text-white text-lg">正在加载页面内容...</p>
+      </div>
+
+      <!-- 错误提示 -->
+      <div v-if="error" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md mb-8">
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <i class="fas fa-exclamation-circle text-red-500 mt-1"></i>
+          </div>
+          <div class="ml-3">
+            <p class="font-bold">加载失败</p>
+            <p>{{ error }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 页面卡片网格 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div v-for="(page, index) in pages" :key="index"
+          class="bg-white rounded-xl shadow-lg overflow-hidden hover-rise">
+          <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                <i :class="getIconForPage(page.filename)" class="mr-2 text-indigo-600"></i>
+                {{ page.title }}
+              </h2>
+              <a :href="page.filename" class="text-indigo-600 hover:text-indigo-800">
+                <i class="fas fa-external-link-alt"></i>
+              </a>
+            </div>
+            <div class="page-card">
+              <div class="page-card-content text-gray-600 text-sm">
+                {{ page.description }}
+              </div>
+              <div class="page-card-overlay"></div>
+            </div>
+          </div>
+          <div class="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+            <span class="text-xs text-gray-500">
+              <i class="fas fa-code mr-1"></i>
+              {{ formatFileSize(page.size) }}
+            </span>
+            <a :href="page.filename"
+              class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+              访问页面
+            </a>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="py-8 text-center text-white">
+      <div class="max-w-5xl mx-auto">
+        <p class="text-indigo-200">© 2023 答案之书 - 所有页面自动索引</p>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // 创建Vue应用
+    const app = Vue.createApp({
+      data() {
+        return {
+          pages: [],
+          loading: true,
+          error: null
+        };
+      },
+      mounted() {
+        this.fetchPages();
+      },
+      methods: {
+        // 获取所有HTML页面
+        async fetchPages() {
+          try {
+            // 获取当前目录下的所有文件
+            const response = await fetch('.');
+            const html = await response.text();
+
+            // 解析HTML以获取文件列表
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const links = Array.from(doc.querySelectorAll('a'));
+
+            // 过滤出HTML文件（排除index.html自身）
+            const htmlFiles = links
+              .map(link => link.getAttribute('href'))
+              .filter(href => href && href.endsWith('.html') && href !== 'index.html');
+
+            // 获取每个页面的内容
+            const pagePromises = htmlFiles.map(filename => this.fetchPageInfo(filename));
+            this.pages = await Promise.all(pagePromises);
+
+            this.loading = false;
+          } catch (err) {
+            console.error('Error fetching pages:', err);
+            this.error = '获取页面列表失败，请刷新页面重试。';
+            this.loading = false;
+          }
+        },
+
+        // 获取单个页面的信息
+        async fetchPageInfo(filename) {
+          try {
+            const response = await fetch(filename);
+            const html = await response.text();
+
+            // 解析HTML
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // 获取标题
+            const title = doc.querySelector('title')?.textContent || filename;
+
+            // 获取描述（从内容中提取）
+            const bodyText = doc.body.textContent.replace(/\s+/g, ' ').trim();
+            const description = bodyText.substring(0, 500) + '...';
+
+            return {
+              filename,
+              title,
+              description,
+              size: response.headers.get('content-length') || 0
+            };
+          } catch (err) {
+            console.error(`Error fetching ${filename}:`, err);
+            return {
+              filename,
+              title: filename,
+              description: '无法加载页面内容',
+              size: 0
+            };
+          }
+        },
+
+        // 根据文件名获取图标
+        getIconForPage(filename) {
+          const iconMap = {
+            'text_topic.html': 'fas fa-book',
+            'ai-model.html': 'fas fa-robot',
+            'ocr.html': 'fas fa-eye',
+            'upload.html': 'fas fa-cloud-upload-alt'
+          };
+
+          return iconMap[filename] || 'fas fa-file';
+        },
+
+        // 格式化文件大小
+        formatFileSize(bytes) {
+          if (!bytes) return '未知大小';
+
+          const units = ['B', 'KB', 'MB', 'GB'];
+          let size = parseInt(bytes, 10);
+          let unitIndex = 0;
+
+          while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+          }
+
+          return `${size.toFixed(1)} ${units[unitIndex]}`;
+        }
+      }
+    });
+
+    // 挂载Vue应用
+    app.mount('#app');
+  </script>
+</body>
+
+</html>
