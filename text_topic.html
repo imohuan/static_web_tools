@@ -935,15 +935,27 @@
 
     <!-- 题目详情弹窗 -->
     <div v-if="showQuestionDetailModal"
-      class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6 z-50">
-      <div class="bg-white rounded-3xl w-full max-w-2xl shadow-2xl bounce-in max-h-[90vh] flex flex-col">
+      class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div class="bg-white w-full h-full shadow-2xl bounce-in flex flex-col">
         <!-- 顶部导航栏 -->
-        <div class="gradient-bg px-6 py-4 rounded-t-3xl flex items-center justify-between">
-          <button @click="showQuestionDetailModal = false" class="text-white p-2 hover:bg-white/20 rounded-full">
-            <i data-lucide="arrow-left" class="w-5 h-5"></i>
-          </button>
-          <h3 class="text-lg font-bold text-white">题目详情</h3>
-          <div class="w-9"></div> <!-- 占位元素保持居中 -->
+        <div class="gradient-bg px-6 py-4 flex items-center justify-between">
+          <div class="flex gap-2 items-center">
+            <button @click="showQuestionDetailModal = false" class="text-white p-2 hover:bg-white/20 rounded-full">
+              <i data-lucide="arrow-left" class="w-5 h-5"></i>
+            </button>
+            <h3 class="text-lg font-bold text-white">题目详情</h3>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button @mousedown="startDecreaseFontSize" @mouseup="stopFontSizeChange" @mouseleave="stopFontSizeChange"
+              class="text-white p-2 hover:bg-white/20 rounded-full">
+              <i data-lucide="minus" class="w-4 h-4"></i>
+            </button>
+            <span class="text-white text-sm">{{ detailFontSize }}px</span>
+            <button @mousedown="startIncreaseFontSize" @mouseup="stopFontSizeChange" @mouseleave="stopFontSizeChange"
+              class="text-white p-2 hover:bg-white/20 rounded-full">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+            </button>
+          </div>
         </div>
 
         <!-- 内容区域 -->
@@ -964,7 +976,8 @@
           <!-- 题目内容 -->
           <div class="mb-6">
             <h4 class="text-gray-500 text-sm mb-2">题目内容</h4>
-            <p class="text-gray-800 leading-relaxed p-4 bg-gray-50 rounded-xl">
+            <p class="text-gray-800 leading-relaxed p-4 bg-gray-50 rounded-xl"
+              :style="{ fontSize: `${detailFontSize}px` }">
               {{ currentDetailQuestion.title }}
             </p>
           </div>
@@ -980,7 +993,8 @@
               </button>
             </div>
             <div class="p-4 bg-green-50 rounded-xl">
-              <p class="text-green-700 font-medium">{{ currentDetailQuestion.answer }}</p>
+              <p class="text-green-700 font-medium" :style="{ fontSize: `${detailFontSize}px` }">{{
+                currentDetailQuestion.answer }}</p>
             </div>
           </div>
 
@@ -989,12 +1003,19 @@
             <h4 class="text-gray-500 text-sm mb-2">AI生成的答案</h4>
             <div v-for="(answer, index) in generatedAnswers" :key="index"
               class="p-4 bg-blue-50 rounded-xl mb-3 border border-blue-100">
-              <div class="flex items-start justify-between">
-                <p class="text-blue-700">{{ answer }}</p>
-                <div class="flex space-x-2 ml-3">
-                  <button @click="useGeneratedAnswer(answer)"
-                    class="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors">
-                    <i data-lucide="check" class="w-4 h-4"></i>
+              <div class="flex flex-col">
+                <p class="text-blue-700 mb-3" :style="{ fontSize: `${detailFontSize}px` }">{{ answer.answer || answer }}
+                </p>
+                <div class="flex justify-end space-x-2">
+                  <button @click="deleteGeneratedAnswer(index)"
+                    class="px-3 py-1 bg-red-100 text-red-600 rounded-full text-xs hover:bg-red-200 transition-colors flex items-center">
+                    <i data-lucide="trash-2" class="w-3 h-3 mr-1"></i>
+                    删除
+                  </button>
+                  <button @click="useGeneratedAnswer(answer.answer || answer)"
+                    class="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-xs hover:bg-blue-200 transition-colors flex items-center">
+                    <i data-lucide="check" class="w-3 h-3 mr-1"></i>
+                    使用此答案
                   </button>
                 </div>
               </div>
@@ -1113,6 +1134,16 @@
                 配置生成答案时的提示词，可使用以下变量标签：
               </div>
               <textarea v-model="config.answerPrompt" placeholder="请根据以下题目生成一个准确、详细的答案：{{title}}"
+                class="w-full h-32 p-4 border border-gray-200 rounded-xl resize-none input-glow"></textarea>
+            </div>
+
+            <!-- 多个答案生成提示词 -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">多个答案生成提示词</label>
+              <div class="mb-2 text-xs text-gray-500">
+                配置生成多个答案时的提示词，可使用以下变量标签：
+              </div>
+              <textarea v-model="config.multipleAnswersPrompt" placeholder="请根据以下题目生成多个不同角度的答案，以帮助更全面理解题目：{{title}}"
                 class="w-full h-32 p-4 border border-gray-200 rounded-xl resize-none input-glow"></textarea>
             </div>
 
@@ -1343,6 +1374,8 @@
         const currentDetailQuestion = ref({});
         const generatedAnswers = ref([]);
         const isGeneratingAnswers = ref(false);
+        const detailFontSize = ref(16); // 添加题目详情页面的字体大小控制
+        let fontSizeInterval = null; // 用于长按调整字体大小的定时器
 
         // 添加题目相关状态
         const showAddQuestionModal = ref(false);
@@ -1373,7 +1406,8 @@
         // 配置相关状态
         const showConfigModal = ref(false);
         const config = ref({
-          answerPrompt: '请根据以下题目生成一个准确、详细的答案：{{title}}'
+          answerPrompt: '请根据以下题目生成一个准确、详细的答案：{{title}}',
+          multipleAnswersPrompt: '请根据以下题目生成多个不同角度的答案，以帮助更全面理解题目：{{title}}'
         });
         const testPromptInput = ref('');
         const testPromptResult = ref(null);
@@ -1681,7 +1715,8 @@
                   subjects_name: subjects_name,
                   classification: item.classification || '未分类',
                   title: item.title || '未识别题目',
-                  answer: item.answer || '未识别答案'
+                  answer: item.answer || '未识别答案',
+                  answers: [] // 初始化空的 answers 数组
                 }));
 
                 // 题目去重处理
@@ -1887,7 +1922,8 @@
         const showQuestionDetail = (question) => {
           currentDetailQuestion.value = question;
           showQuestionDetailModal.value = true;
-          generatedAnswers.value = [];
+          // 加载保存的生成答案
+          loadGeneratedAnswers();
           // 重新初始化图标
           setTimeout(() => lucide.createIcons(), 100);
         };
@@ -1916,32 +1952,140 @@
             try {
               const data_json = JSON.parse(result.data);
               if (data_json && data_json.output && Array.isArray(data_json.output)) {
-                generatedAnswers.value = data_json.output;
+                // 确保当前题目有 answers 数组
+                if (!currentDetailQuestion.value.answers) {
+                  currentDetailQuestion.value.answers = [];
+                }
+
+                // 处理新答案
+                const newAnswers = data_json.output.map(item => {
+                  // 处理可能的不同数据结构
+                  if (typeof item === 'string') {
+                    return { answer: item };
+                  } else if (item && item.answer) {
+                    return item;
+                  } else {
+                    return { answer: JSON.stringify(item) };
+                  }
+                });
+
+                // 将新答案添加到题目的 answers 数组中
+                currentDetailQuestion.value.answers.push(...newAnswers);
+
+                // 更新生成的答案列表（用于显示）
+                generatedAnswers.value = [...currentDetailQuestion.value.answers];
+
+                // 更新原始题目列表中的数据
+                updateQuestionWithAnswers();
               } else {
                 // 模拟生成的答案
-                generatedAnswers.value = [
-                  "这是AI生成的第一个答案，可能更加详细或有不同角度的解释。",
-                  "这是AI生成的另一个答案，提供了不同的思路或解法。"
+                const mockAnswers = [
+                  { answer: "这是AI生成的第一个答案，可能更加详细或有不同角度的解释。" },
+                  { answer: "这是AI生成的另一个答案，提供了不同的思路或解法。" }
                 ];
+
+                // 确保当前题目有 answers 数组
+                if (!currentDetailQuestion.value.answers) {
+                  currentDetailQuestion.value.answers = [];
+                }
+
+                // 将模拟答案添加到题目的 answers 数组中
+                currentDetailQuestion.value.answers.push(...mockAnswers);
+
+                // 更新生成的答案列表（用于显示）
+                generatedAnswers.value = [...currentDetailQuestion.value.answers];
+
+                // 更新原始题目列表中的数据
+                updateQuestionWithAnswers();
               }
             } catch (error) {
               console.error('解析API响应失败:', error);
               // 使用备用数据
-              generatedAnswers.value = [
-                "这是AI生成的第一个答案，可能更加详细或有不同角度的解释。",
-                "这是AI生成的另一个答案，提供了不同的思路或解法。"
+              const backupAnswers = [
+                { answer: "这是AI生成的第一个答案，可能更加详细或有不同角度的解释。" },
+                { answer: "这是AI生成的另一个答案，提供了不同的思路或解法。" }
               ];
+
+              // 确保当前题目有 answers 数组
+              if (!currentDetailQuestion.value.answers) {
+                currentDetailQuestion.value.answers = [];
+              }
+
+              // 将备用答案添加到题目的 answers 数组中
+              currentDetailQuestion.value.answers.push(...backupAnswers);
+
+              // 更新生成的答案列表（用于显示）
+              generatedAnswers.value = [...currentDetailQuestion.value.answers];
+
+              // 更新原始题目列表中的数据
+              updateQuestionWithAnswers();
             }
           } catch (error) {
             console.error('生成答案失败:', error);
             notify.error('生成答案失败，请稍后重试');
             // 使用备用数据
-            generatedAnswers.value = [
-              "这是AI生成的第一个答案，可能更加详细或有不同角度的解释。",
-              "这是AI生成的另一个答案，提供了不同的思路或解法。"
+            const backupAnswers = [
+              { answer: "这是AI生成的第一个答案，可能更加详细或有不同角度的解释。" },
+              { answer: "这是AI生成的另一个答案，提供了不同的思路或解法。" }
             ];
+
+            // 确保当前题目有 answers 数组
+            if (!currentDetailQuestion.value.answers) {
+              currentDetailQuestion.value.answers = [];
+            }
+
+            // 将备用答案添加到题目的 answers 数组中
+            currentDetailQuestion.value.answers.push(...backupAnswers);
+
+            // 更新生成的答案列表（用于显示）
+            generatedAnswers.value = [...currentDetailQuestion.value.answers];
+
+            // 更新原始题目列表中的数据
+            updateQuestionWithAnswers();
           } finally {
             isGeneratingAnswers.value = false;
+          }
+        };
+
+        // 删除生成的答案
+        const deleteGeneratedAnswer = (index) => {
+          if (index >= 0 && index < generatedAnswers.value.length) {
+            // 从当前题目的 answers 数组中删除
+            if (currentDetailQuestion.value.answers) {
+              currentDetailQuestion.value.answers.splice(index, 1);
+            }
+
+            // 更新生成的答案列表（用于显示）
+            generatedAnswers.value = [...currentDetailQuestion.value.answers];
+
+            // 更新原始题目列表中的数据
+            updateQuestionWithAnswers();
+          }
+        };
+
+        // 更新原始题目列表中的答案数据
+        const updateQuestionWithAnswers = () => {
+          const index = questions.value.findIndex(q =>
+            q.title === currentDetailQuestion.value.title &&
+            q.subjects_name === currentDetailQuestion.value.subjects_name
+          );
+
+          if (index !== -1) {
+            // 更新原始题目的 answers 数组
+            questions.value[index].answers = [...currentDetailQuestion.value.answers];
+            saveToLocalStorage();
+          }
+        };
+
+        // 加载生成的答案
+        const loadGeneratedAnswers = () => {
+          // 如果当前题目已有 answers 数组，则使用它
+          if (currentDetailQuestion.value.answers && Array.isArray(currentDetailQuestion.value.answers)) {
+            generatedAnswers.value = [...currentDetailQuestion.value.answers];
+          } else {
+            // 否则初始化为空数组
+            currentDetailQuestion.value.answers = [];
+            generatedAnswers.value = [];
           }
         };
 
@@ -1960,6 +2104,7 @@
 
           if (index !== -1) {
             questions.value[index].answer = answer;
+            // 不修改 answers 数组，保持原样
             saveToLocalStorage();
             notify.success('已更新题目答案');
           }
@@ -2031,7 +2176,8 @@
             subjects_name: newQuestion.value.subjects_name,
             classification: newQuestion.value.classification,
             title: newQuestion.value.title,
-            answer: newQuestion.value.answer || '暂无答案'
+            answer: newQuestion.value.answer || '暂无答案',
+            answers: [] // 初始化空的 answers 数组
           });
 
           // 保存到本地存储
@@ -2139,6 +2285,42 @@
           }
         };
 
+        // 字体大小调整相关方法
+        const startIncreaseFontSize = () => {
+          // 先立即执行一次
+          detailFontSize.value += 1;
+          // 然后设置定时器持续执行
+          fontSizeInterval = setInterval(() => {
+            detailFontSize.value += 1;
+            // 设置上限，防止字体过大
+            if (detailFontSize.value > 48) {
+              detailFontSize.value = 48;
+              stopFontSizeChange();
+            }
+          }, 100);
+        };
+
+        const startDecreaseFontSize = () => {
+          // 先立即执行一次
+          detailFontSize.value -= 1;
+          // 然后设置定时器持续执行
+          fontSizeInterval = setInterval(() => {
+            detailFontSize.value -= 1;
+            // 设置下限，防止字体过小
+            if (detailFontSize.value < 8) {
+              detailFontSize.value = 8;
+              stopFontSizeChange();
+            }
+          }, 100);
+        };
+
+        const stopFontSizeChange = () => {
+          if (fontSizeInterval) {
+            clearInterval(fontSizeInterval);
+            fontSizeInterval = null;
+          }
+        };
+
         return {
           currentTab,
           subjects,
@@ -2189,6 +2371,13 @@
           isGeneratingAnswers,
           generateMoreAnswers,
           useGeneratedAnswer,
+          detailFontSize,
+          deleteGeneratedAnswer,
+          loadGeneratedAnswers,
+          updateQuestionWithAnswers,
+          startIncreaseFontSize,
+          startDecreaseFontSize,
+          stopFontSizeChange,
           // 添加题目相关
           showAddQuestionModal,
           newQuestion,
