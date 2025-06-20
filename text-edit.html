@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Text Editor</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/pinyin-pro/3.26.0/index.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .highlight {
+      background-color: #fef08a;
+    }
+
+    .keyboard-key {
+      transition: all 0.1s ease;
+      user-select: none;
+    }
+
+    .keyboard-key:active {
+      transform: scale(0.95);
+      background-color: #3b82f6;
+    }
+
+    .file-item {
+      transition: all 0.2s ease;
+    }
+
+    .file-item:hover {
+      background-color: #f3f4f6;
+    }
+
+    .editor-content {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      line-height: 1.6;
+    }
+
+    .modal-backdrop {
+      backdrop-filter: blur(4px);
+    }
+  </style>
+</head>
+
+<body class=" w-full h-screen bg-gray-50">
+  <div id="app" class="w-full h-full flex flex-col overflow-hidden">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <button @click="showFileManager = true" class="p-2 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="folder"></i>
+        </button>
+        <h1 class="text-lg font-semibold text-gray-800">{{ currentFile?.name || '无文件' }}</h1>
+      </div>
+      <div class="flex items-center space-x-2">
+        <i data-lucide="text-size" class="text-gray-500 h-5 w-5"></i>
+        <input type="range" v-model.number="fontSize" min="12" max="24" class="w-20 sm:w-24 mx-1">
+        <span class="text-sm text-gray-600 w-12 text-center">{{ fontSize }}px</span>
+        <button @click="toggleEditMode" :class="[
+                        'p-2 rounded-lg transition-colors',
+                        isEditing ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'
+                    ]">
+          <i :data-lucide="isEditing ? 'check' : 'edit'"></i>
+        </button>
+        <button @click="triggerImport" class="p-2 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="folder-up"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Hidden File Input for Import -->
+    <input type="file" ref="fileInput" @change="handleFileImport" accept=".json,application/json" class="hidden">
+
+    <!-- Editor Container -->
+    <div class="flex-1 editor-container relative overflow-y-auto">
+      <!-- Editor -->
+      <div v-if="currentFile" class="p-4 bg-white mx-2 mt-2 rounded-lg shadow-sm min-h-full flex flex-col">
+        <div v-if="!isEditing" class="editor-content" :style="{ fontSize: fontSize + 'px' }"
+          v-html="highlightedContent">
+        </div>
+        <textarea v-else v-model="currentFile.content" @input="saveFile"
+          class="w-full flex-1 resize-none border-none outline-none editor-content"
+          :style="{ fontSize: fontSize + 'px' }" placeholder="开始输入...">
+                </textarea>
+      </div>
+
+      <!-- No File Selected -->
+      <div v-else class="h-full flex items-center justify-center text-gray-500">
+        <div class="text-center">
+          <i data-lucide="file-text" class="mx-auto mb-2 w-12 h-12"></i>
+          <p>未选择文件</p>
+          <button @click="showFileManager = true"
+            class="mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+            打开文件管理器
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="bg-white border-t px-4 py-3">
+      <div class="flex items-center space-x-2 mb-3">
+        <div class="flex-1 relative">
+          <input v-model="searchQuery" @input="performSearch" type="text" placeholder="在文档中搜索..."
+            class="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+        </div>
+        <button v-if="searchQuery" @click="clearSearch" class="p-2 hover:bg-gray-100 rounded-lg">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+        <button @click="showKeyboard = !showKeyboard" class="p-2 hover:bg-gray-100 rounded-lg"
+          :class="{'bg-blue-100 text-blue-600': showKeyboard}">
+          <i data-lucide="keyboard" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Virtual Keyboard -->
+      <div v-if="showKeyboard" class="space-y-1.5 max-w-xl mx-auto">
+        <!-- Row 1: QWERTY -->
+        <div class="flex flex-wrap gap-1 justify-center">
+          <button v-for="key in keyboardLayout[0]" :key="key" @click="addToSearch(key)"
+            class="keyboard-key w-8 py-2.5 bg-gray-200 rounded text-sm font-medium hover:bg-gray-300">
+            {{ key }}
+          </button>
+        </div>
+
+        <!-- Row 2: ASDF -->
+        <div class="flex flex-wrap gap-1 justify-center">
+          <button v-for="key in keyboardLayout[1]" :key="key" @click="addToSearch(key)"
+            class="keyboard-key w-8 py-2.5 bg-gray-200 rounded text-sm font-medium hover:bg-gray-300">
+            {{ key }}
+          </button>
+        </div>
+
+        <!-- Row 3: ZXCV + Special -->
+        <div class="flex flex-wrap gap-1 justify-center items-center">
+          <button @click="clearSearch"
+            class="keyboard-key flex-grow px-2 py-2 bg-gray-300 rounded text-sm font-medium hover:bg-gray-400">
+            清空
+          </button>
+          <button v-for="key in keyboardLayout[2]" :key="key" @click="addToSearch(key)"
+            class="keyboard-key w-8 py-2.5 bg-gray-200 rounded text-sm font-medium hover:bg-gray-300">
+            {{ key }}
+          </button>
+          <button @click="backspaceSearch"
+            class="keyboard-key flex-grow px-2 py-2 bg-gray-300 rounded text-sm font-medium hover:bg-gray-400">
+            ⌫
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- File Manager Modal -->
+    <div v-if="showFileManager"
+      class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop bg-black bg-opacity-50"
+      @click.self="showFileManager = false">
+      <div class="bg-white rounded-lg w-11/12 max-w-md max-h-96 overflow-hidden">
+        <div class="flex items-center justify-between p-4 border-b">
+          <h3 class="text-lg font-semibold">File Manager</h3>
+          <button @click="showFileManager = false" class="p-1 hover:bg-gray-100 rounded">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-4">
+          <div class="flex space-x-2 mb-4">
+            <input v-model="newFileName" @keyup.enter="createFile" type="text" placeholder="新文件名..."
+              class="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button @click="createFile" :disabled="!newFileName.trim()"
+              class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <div class="space-y-2 max-h-48 overflow-y-auto">
+            <div v-for="file in files" :key="file.id"
+              class="file-item flex items-center justify-between p-3 border rounded-lg cursor-pointer"
+              @click="selectFile(file)">
+              <div class="flex items-center space-x-3">
+                <i data-lucide="file-text" class="w-4 h-4 text-gray-500"></i>
+                <span class="font-medium">{{ file.name }}</span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs text-gray-500">{{ formatDate(file.lastModified) }}</span>
+                <button @click.stop="deleteFile(file.id)" class="p-1 hover:bg-red-100 rounded text-red-500">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div v-if="files.length === 0" class="text-center py-8 text-gray-500">
+              <i data-lucide="folder-open" class="mx-auto mb-2 w-8 h-8"></i>
+              <p>暂无文件</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 添加拼音首字母转换函数
+    const getPinyinInitials = (text) => {
+      try {
+        return pinyinPro.pinyin(text, { pattern: 'first', toneType: 'none', type: 'array' }).join('')
+      } catch (e) {
+        console.error('拼音转换错误:', e);
+        return ''
+      }
+    };
+
+
+    const { createApp, ref, computed, onMounted, watch } = Vue;
+
+    // File management hook
+    function useFileSystem() {
+      const files = ref([]);
+      const STORAGE_KEY = 'textEditor_files';
+
+      const loadFiles = () => {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            files.value = JSON.parse(stored);
+          }
+        } catch (error) {
+          console.error('Error loading files:', error);
+          files.value = [];
+        }
+      };
+
+      const saveFiles = () => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(files.value));
+        } catch (error) {
+          console.error('Error saving files:', error);
+        }
+      };
+
+      const createFile = (name) => {
+        const newFile = {
+          id: Date.now().toString(),
+          name: name.trim(),
+          content: '',
+          lastModified: new Date().toISOString()
+        };
+        files.value.push(newFile);
+        saveFiles();
+        return newFile;
+      };
+
+      const updateFile = (id, content) => {
+        const file = files.value.find(f => f.id === id);
+        if (file) {
+          file.content = content;
+          file.lastModified = new Date().toISOString();
+          saveFiles();
+        }
+      };
+
+      const deleteFile = (id) => {
+        const index = files.value.findIndex(f => f.id === id);
+        if (index > -1) {
+          files.value.splice(index, 1);
+          saveFiles();
+          return true;
+        }
+        return false;
+      };
+
+      /**
+       * Imports files from a JSON string, replacing existing files.
+       * @param {string} jsonData The JSON string representing an array of file objects.
+       * @returns {{success: boolean, error?: string}} An object indicating success or failure.
+       */
+      const importFiles = (importedData) => {
+        try {
+          // const importedData = JSON.parse(jsonData);
+
+          // Validate that the imported data is an array
+          if (!Array.isArray(importedData)) {
+            throw new Error('Imported data is not a valid array.');
+          }
+
+          // Validate the structure of each file object in the array
+          const isValid = importedData.every(file =>
+            typeof file === 'object' &&
+            file !== null &&
+            'id' in file &&
+            'name' in file &&
+            'content' in file &&
+            'lastModified' in file
+          );
+
+          if (!isValid) {
+            throw new Error('Imported data contains invalid file structures.');
+          }
+
+          files.value = importedData;
+          saveFiles();
+          return { success: true };
+        } catch (error) {
+          console.error('Error importing files:', error);
+          return { success: false, error: error.message };
+        }
+      };
+
+      return {
+        files,
+        loadFiles,
+        createFile,
+        updateFile,
+        deleteFile,
+        importFiles
+      };
+    }
+
+    // Search functionality hook
+    function useSearch() {
+      const searchQuery = ref('');
+      const searchResults = ref([]);
+
+      /**
+       * Escapes special characters in a string for use in a regular expression.
+       * @param {string} str The string to escape.
+       * @returns {string} The escaped string.
+       */
+      const escapeRegex = (str) => {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      };
+
+      const performSearch = (content) => {
+        if (!searchQuery.value.trim() || !content) {
+          searchResults.value = [];
+          return content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        const query = searchQuery.value;
+        const queryLower = query.toLowerCase();
+        let matches = [];
+
+        // 1. Literal matches
+        const literalRegex = new RegExp(escapeRegex(query), 'gi');
+        let match;
+        while ((match = literalRegex.exec(content)) !== null) {
+          matches.push({ start: match.index, end: match.index + match[0].length });
+        }
+
+        // 2. Pinyin initials matches (only for alphabetic queries)
+        if (/^[a-z\s]*$/i.test(query)) {
+          const pinyinQuery = queryLower.replace(/\s/g, '');
+          if (pinyinQuery) {
+            for (let i = 0; i < content.length; i++) {
+              // Start matching from a Chinese character
+              if (/[\u4e00-\u9fa5]/.test(content[i])) {
+                let currentText = '';
+                for (let j = i; j < content.length; j++) {
+                  const char = content[j];
+                  if (/[\u4e00-\u9fa5]/.test(char)) {
+                    currentText += char;
+                    const pinyinInitials = getPinyinInitials(currentText).toLowerCase();
+
+                    if (pinyinInitials === pinyinQuery) {
+                      matches.push({ start: i, end: j + 1 });
+                      break;
+                    }
+
+                    if (!pinyinQuery.startsWith(pinyinInitials)) {
+                      break;
+                    }
+                  } else {
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (matches.length === 0) {
+          searchResults.value = [];
+          return content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // 3. Merge overlapping matches
+        matches.sort((a, b) => a.start - b.start);
+        const mergedMatches = matches.length > 0 ? [matches[0]] : [];
+        for (let i = 1; i < matches.length; i++) {
+          const last = mergedMatches[mergedMatches.length - 1];
+          const current = matches[i];
+          if (current.start < last.end) {
+            last.end = Math.max(last.end, current.end);
+          } else {
+            mergedMatches.push(current);
+          }
+        }
+
+        searchResults.value = mergedMatches.map(m => content.substring(m.start, m.end));
+
+        // 4. Build highlighted string
+        let result = '';
+        let lastIndex = 0;
+        const escapeHtml = (str) => str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        for (const m of mergedMatches) {
+          result += escapeHtml(content.substring(lastIndex, m.start));
+          result += `<span class="highlight">${escapeHtml(content.substring(m.start, m.end))}</span>`;
+          lastIndex = m.end;
+        }
+        result += escapeHtml(content.substring(lastIndex));
+
+        return result;
+      };
+
+      const clearSearch = () => {
+        searchQuery.value = '';
+        searchResults.value = [];
+      };
+
+      return {
+        searchQuery,
+        searchResults,
+        performSearch,
+        clearSearch
+      };
+    }
+
+    // Editor state hook
+    function useEditor() {
+      const isEditing = ref(false);
+      const fontSize = ref(16);
+      const currentFile = ref(null);
+
+      const toggleEditMode = () => {
+        isEditing.value = !isEditing.value;
+      };
+
+      const selectFile = (file) => {
+        currentFile.value = file;
+        isEditing.value = false;
+      };
+
+      return {
+        isEditing,
+        fontSize,
+        currentFile,
+        toggleEditMode,
+        selectFile
+      };
+    }
+
+    createApp({
+      setup() {
+        // Use hooks
+        const fileSystem = useFileSystem();
+        const search = useSearch();
+        const editor = useEditor();
+
+        // UI state
+        const showFileManager = ref(false);
+        const newFileName = ref('');
+        const showKeyboard = ref(false);
+        const fileInput = ref(null); // Reference for the hidden file input
+
+        // Keyboard layout
+        const keyboardLayout = [
+          ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+          ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+          ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
+        ];
+
+        // Computed
+        const highlightedContent = computed(() => {
+          if (!editor.currentFile.value?.content) return '';
+          return search.performSearch(editor.currentFile.value.content);
+        });
+
+        // Methods
+        const createFile = () => {
+          if (!newFileName.value.trim()) return;
+
+          const file = fileSystem.createFile(newFileName.value);
+          editor.selectFile(file);
+          newFileName.value = '';
+          showFileManager.value = false;
+        };
+
+        /**
+         * Programmatically clicks the hidden file input to open the file dialog.
+         */
+        const triggerImport = () => {
+          fileInput.value.click();
+        };
+
+        const transform = (a) => {
+          const subjects_map = {}
+          a.questions.forEach(q => {
+            const k = q.subjects_name
+            if (!subjects_map[k]) subjects_map[k] = ""
+            subjects_map[k] += `${q.title}:(${q.answer})\n`
+            if (q.answers.length > 0) subjects_map[k] += `更多答案: ${q.answers.join("\n")}\n`
+          })
+
+          const files = []
+          for (let [k, v] of Object.entries(subjects_map)) {
+            files.push({
+              id: Date.now().toString(),
+              name: k.trim(),
+              content: v,
+              lastModified: new Date().toISOString()
+            })
+          }
+          return files
+        }
+
+        /**
+         * Handles the file import process when a user selects a file.
+         * @param {Event} event The file input change event.
+         */
+        const handleFileImport = (event) => {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          if (file.type !== 'application/json') {
+            alert('Please select a valid JSON file.');
+            event.target.value = null;
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const result = fileSystem.importFiles(transform(JSON.parse(e.target.result)));
+            if (result.success) {
+              alert('Files imported successfully!');
+              // If the currently open file was removed by the import, close it.
+              if (editor.currentFile.value) {
+                const currentFileExists = fileSystem.files.value.some(f => f.id === editor.currentFile.value.id);
+                if (!currentFileExists) {
+                  editor.currentFile.value = null;
+                }
+              }
+            } else {
+              alert(`Import failed: ${result.error}`);
+            }
+          };
+          reader.readAsText(file);
+          // Reset the input value to allow importing the same file again
+          event.target.value = null;
+        };
+
+        const selectFile = (file) => {
+          editor.selectFile(file);
+          showFileManager.value = false;
+          search.clearSearch();
+        };
+
+        const deleteFile = (id) => {
+          if (confirm('Are you sure you want to delete this file?')) {
+            const deleted = fileSystem.deleteFile(id);
+            if (deleted && editor.currentFile.value?.id === id) {
+              editor.currentFile.value = null;
+            }
+          }
+        };
+
+        const saveFile = () => {
+          if (editor.currentFile.value) {
+            fileSystem.updateFile(editor.currentFile.value.id, editor.currentFile.value.content);
+          }
+        };
+
+        const addToSearch = (char) => {
+          search.searchQuery.value += char;
+          performSearch();
+        };
+
+        const backspaceSearch = () => {
+          search.searchQuery.value = search.searchQuery.value.slice(0, -1);
+          performSearch();
+        };
+
+        const performSearch = () => {
+          // This is a trigger function. The actual logic is inside the computed property 'highlightedContent'.
+          // We just need to make sure Vue knows to re-evaluate. The dependency on searchQuery does this automatically.
+          // This function can be kept for explicitness or if direct calls are needed elsewhere.
+        };
+
+        const formatDate = (dateString) => {
+          const date = new Date(dateString);
+          return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        };
+
+        // Initialize Lucide icons
+        const initIcons = () => {
+          if (window.lucide) {
+            window.lucide.createIcons();
+          }
+        };
+
+        // Lifecycle
+        onMounted(() => {
+          fileSystem.loadFiles();
+          initIcons();
+        });
+
+        // Watch for icon updates
+        watch([showFileManager, editor.isEditing], () => {
+          setTimeout(initIcons, 10);
+        });
+
+        return {
+          // File system
+          ...fileSystem,
+
+          // Search
+          ...search,
+          performSearch,
+
+          // Editor
+          ...editor,
+
+          // UI state
+          showFileManager,
+          newFileName,
+          keyboardLayout,
+          showKeyboard,
+          fileInput,
+
+          // Computed
+          highlightedContent,
+
+          // Methods
+          createFile,
+          selectFile,
+          deleteFile,
+          saveFile,
+          addToSearch,
+          backspaceSearch,
+          formatDate,
+          triggerImport,
+          handleFileImport
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+
+</html>
