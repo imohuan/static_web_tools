@@ -500,7 +500,8 @@
             const k = q.subjects_name
             if (!subjects_map[k]) subjects_map[k] = ""
             subjects_map[k] += `${q.title}:(${q.answer})\n`
-            if (q.answers.length > 0) subjects_map[k] += `更多答案: ${q.answers.join("\n")}\n`
+            if (q.answers.length > 0) subjects_map[k] += `更多答案: ${q.answers.join("\n")}\n\n`
+            else subjects_map[k] += `\n`
           })
 
           const files = []
